@@ -1,15 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Bot,
-  LayoutDashboard,
-  Mail,
-  CalendarDays,
-  Settings,
-  Trash,
-  HelpCircle,
-} from "lucide-react";
+import { Bot, LayoutDashboard, Mail, CalendarDays, Settings, Trash, HelpCircle, } from "lucide-react";
 
 import { NavFavorites } from "@/components/nav-favorites";
 import { NavMain } from "@/components/nav-main";
@@ -59,48 +51,53 @@ const data = {
       name: "Customer Database",
       emoji: "🏠",
       pages: [
+        { name: "All", url: "/companies/all", emoji: "📗" }, // For TSM and Manager
         { name: "Active", url: "/companies/active", emoji: "📗" },
-        { name: "New Client", url: "#", emoji: "🆕" },
-        { name: "Non-Buying", url: "#", emoji: "🚫" },
-        { name: "Inactive", url: "#", emoji: "🕓" },
-        { name: "Follow Ups", url: "#", emoji: "🔁" },
-        { name: "Group Affiliate", url: "#", emoji: "👥" },
+        { name: "New Client", url: "/companies/newclient", emoji: "🆕" },
+        { name: "Non-Buying", url: "/companies/nonbuying", emoji: "🚫" },
+        { name: "Inactive", url: "/companies/inactive", emoji: "🕓" },
+        { name: "Deletion", url: "/companies/remove", emoji: "🗑️" },
+        { name: "Follow Ups", url: "/companies/followup", emoji: "🔁" },
+        { name: "Group Affiliate", url: "/companies/group", emoji: "👥" },
         { name: "Client History", url: "#", emoji: "📜" },
+        { name: "Pending Accounts", url: "/companies/pending", emoji: "🔁" }, // For TSM and Manager
+        { name: "Pending Transferred", url: "/companies/transfer", emoji: "🔁" }, // For TSM and Manager
+        { name: "Account Deletion", url: "/companies/approval", emoji: "🗑️" }, // For TSM and Manager
       ],
     },
     {
       name: "Work Management",
       emoji: "💼",
       pages: [
-        { name: "Activity Planner", url: "#", emoji: "🎯", },
-        { name: "Manual Task", url: "#", emoji: "✍️", },
-        { name: "Notes", url: "#", emoji: "📝", },
-        { name: "Quotation", url: "#", emoji: "💬", },
-        { name: "Client Coverage Guide", url: "#", emoji: "🧭", },
+        { name: "Activity Planner", url: "/activity/planner", emoji: "🎯" },
+        { name: "Manual Task", url: "#", emoji: "✍️" },
+        { name: "Notes", url: "#", emoji: "📝" },
+        { name: "Quotation", url: "#", emoji: "💬" },
+        { name: "Client Coverage Guide", url: "#", emoji: "🧭" },
       ],
     },
     {
       name: "Reports",
       emoji: "📊",
       pages: [
-        { name: "Account Management", url: "#", emoji: "💰", },
-        { name: "Quotation Summary", url: "#", emoji: "📑", },
-        { name: "Sales Order Summary", url: "#", emoji: "🛒", },
-        { name: "Pending Sales Order", url: "#", emoji: "⏳", },
-        { name: "Sales Invoice Summary", url: "#", emoji: "📄", },
-        { name: "CSR Inquiry Summary", url: "#", emoji: "📞", },
-        { name: "New Client Summary", url: "#", emoji: "🌱", },
-        { name: "FB Marketplace Summary", url: "#", emoji: "🛍️", },
+        { name: "Account Management", url: "#", emoji: "💰" },
+        { name: "Quotation Summary", url: "#", emoji: "📑" },
+        { name: "Sales Order Summary", url: "#", emoji: "🛒" },
+        { name: "Pending Sales Order", url: "#", emoji: "⏳" },
+        { name: "Sales Invoice Summary", url: "#", emoji: "📄" },
+        { name: "CSR Inquiry Summary", url: "#", emoji: "📞" },
+        { name: "New Client Summary", url: "#", emoji: "🌱" },
+        { name: "FB Marketplace Summary", url: "#", emoji: "🛍️" },
       ],
     },
     {
       name: "Conversion Rates",
       emoji: "📈",
       pages: [
-        { name: "Calls to Quote", url: "#", emoji: "☎️", },
-        { name: "Quote To SO", url: "#", emoji: "📑", },
-        { name: "SO To SI", url: "#", emoji: "💳", },
-        { name: "Calls to SI", url: "#", emoji: "🚀", },
+        { name: "Calls to Quote", url: "#", emoji: "☎️" },
+        { name: "Quote To SO", url: "#", emoji: "📑" },
+        { name: "SO To SI", url: "#", emoji: "💳" },
+        { name: "Calls to SI", url: "#", emoji: "🚀" },
       ],
     },
   ],
@@ -224,16 +221,48 @@ export function SidebarLeft({ ...props }: React.ComponentProps<typeof Sidebar>) 
     [userId]
   );
 
+  // Filter pages in Customer Database workspace for TSM and Manager roles
+  const filteredWorkspaces = React.useMemo(() => {
+    const role = userDetails.Role || "Admin";
+
+    return data.workspaces.map((workspace) => {
+      if (workspace.name === "Customer Database") {
+        if (role === "Territory Sales Associate") {
+          // Exclude "All", "Pending Accounts", "Account Deletion" for T Sales Associate
+          return {
+            ...workspace,
+            pages: workspace.pages.filter(
+              (page) =>
+                !["All", "Pending Accounts", "Account Deletion", "Pending Transferred"].includes(page.name)
+            ),
+          };
+        } else if (role === "Territory Sales Manager") {
+          // For Territory Sales Manager, show ONLY All, Pending Accounts, Account Deletion
+          return {
+            ...workspace,
+            pages: workspace.pages.filter((page) =>
+              ["All", "Pending Accounts", "Account Deletion", "Pending Transferred"].includes(page.name)
+            ),
+          };
+        }
+        // Other roles, return full workspace (or customize as needed)
+      }
+      return workspace;
+    });
+  }, [userDetails.Role]);
+
+
+  // Append userId to URLs in filtered workspaces
   const workspacesWithId = React.useMemo(
     () =>
-      data.workspaces.map((workspace) => ({
+      filteredWorkspaces.map((workspace) => ({
         ...workspace,
         pages: workspace.pages.map((page) => ({
           ...page,
           url: withUserId(page.url),
         })),
       })),
-    [withUserId]
+    [filteredWorkspaces, withUserId]
   );
 
   const navMainWithId = React.useMemo(

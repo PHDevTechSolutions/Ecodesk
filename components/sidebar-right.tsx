@@ -109,7 +109,7 @@ export function SidebarRight({
               position: userDetails.Position,
               avatar: userDetails.profilePicture || "/avatars/shadcn.jpg",
             }}
-            userId={userId} // <-- dito
+            userId={userId} 
           />
         ) : (
           <NavUser
@@ -122,8 +122,6 @@ export function SidebarRight({
           />
         )}
       </SidebarHeader>
-
-
       <SidebarContent>
         <DatePicker
           selectedDateRange={dateCreatedFilterRange}

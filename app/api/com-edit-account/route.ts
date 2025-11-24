@@ -7,21 +7,15 @@ if (!Xchire_databaseUrl) {
 }
 const Xchire_sql = neon(Xchire_databaseUrl);
 
-function normalizeFieldToArray(value: any): string[] {
+function normalizeField(value: any): string {
   if (Array.isArray(value)) {
-    return value.filter(v => typeof v === "string" && v.trim() !== "").map(v => v.trim());
+    const filtered = value.filter((v) => v && v.trim() !== "");
+    return filtered.join(", ");
   }
   if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(v => typeof v === "string" && v.trim() !== "").map(v => v.trim());
-      }
-    } catch {
-      return value.split(",").map(v => v.trim()).filter(v => v !== "");
-    }
+    return value.trim();
   }
-  return [];
+  return "";
 }
 
 export async function PUT(req: Request) {
@@ -30,39 +24,43 @@ export async function PUT(req: Request) {
     const {
       id,
       referenceid,
-      companyname,
-      contactperson,
-      contactnumber,
-      emailaddress,
+      company_name,
+      contact_person,
+      contact_number,
+      email_address,
       address,
-      deliveryaddress,
-      area,
-      typeclient,
-      date_created,
+      delivery_address,
+      region,
+      type_client,
+      date_updated,
+      industry,
       status,
+      company_group,
     } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Missing account id." }, { status: 400 });
     }
 
-    const contactPersonArray = normalizeFieldToArray(contactperson);
-    const contactNumberArray = normalizeFieldToArray(contactnumber);
-    const emailAddressArray = normalizeFieldToArray(emailaddress);
+    const contactPersonArray = normalizeField(contact_person);
+    const contactNumberArray = normalizeField(contact_number);
+    const emailAddressArray = normalizeField(email_address);
 
     const updated = await Xchire_sql`
       UPDATE accounts SET
         referenceid = ${referenceid},
-        companyname = ${companyname},
-        contactperson = ${contactPersonArray},
-        contactnumber = ${contactNumberArray},
-        emailaddress = ${emailAddressArray},
+        company_name = ${company_name},
+        contact_person = ${contactPersonArray},
+        contact_number = ${contactNumberArray},
+        email_address = ${emailAddressArray},
         address = ${address},
-        deliveryaddress = ${deliveryaddress},
-        area = ${area},
-        typeclient = ${typeclient},
-        date_created = ${date_created},
-        status = ${status}
+        delivery_address = ${delivery_address},
+        region = ${region},
+        type_client = ${type_client},
+        date_updated = ${date_updated},
+        industry = ${industry},
+        status = ${status},
+        company_group = ${company_group}
       WHERE id = ${id}
       RETURNING *;
     `;

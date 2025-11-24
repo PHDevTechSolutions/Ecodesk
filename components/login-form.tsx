@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Field,
   FieldDescription,
@@ -28,7 +27,6 @@ import { Globe, Calendar } from "lucide-react";
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const [Email, setEmail] = useState("");
   const [Password, setPassword] = useState("");
-  const [Department, setDepartment] = useState("");
   const [loading, setLoading] = useState(false);
   const [lockUntil, setLockUntil] = useState<string | null>(null);
   const [formattedLockUntil, setFormattedLockUntil] = useState<string | null>(null);
@@ -59,8 +57,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const getLocation = async () => {
     if (!navigator.geolocation) return null;
     try {
-      const position = await new Promise<GeolocationPosition>(
-        (resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject)
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject)
       );
       return {
         latitude: position.coords.latitude,
@@ -83,7 +81,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
 
-      if (!Email || !Password || !Department) {
+      if (!Email || !Password) {
         toast.error("All fields are required!");
         return;
       }
@@ -98,10 +96,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         const response = await fetch("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ Email, Password, Department }),
+          body: JSON.stringify({ Email, Password }), // Department removed
         });
 
-        // DEBUGGING: log raw text response
         const text = await response.text();
 
         let result;
@@ -121,12 +118,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             return;
           }
 
-          if (result.Department !== Department) {
-            toast.error("Department mismatch!");
-            playSound("/login-failed.mp3");
-            setLoading(false);
-            return;
-          }
+          // No Department check here anymore
 
           // Log activity after successful login
           const deviceId = getDeviceId();
@@ -137,7 +129,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: Email,
-              department: Department,
               status: "login",
               timestamp: new Date().toISOString(),
               deviceId,
@@ -148,13 +139,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           toast.success("Login successful!");
           playSound("/login.mp3");
 
-          // SET USER ID agad bago mag redirect para iwas race condition
           setUserId(result.userId);
-
-          // Diretso ang redirect, walang delay para walang pagka-hang
           router.push(`/dashboard?id=${encodeURIComponent(result.userId)}`);
 
-          setLoading(false); // Optional, pero pwede rin dito
+          setLoading(false);
         } else {
           if (result.lockUntil) {
             setLockUntil(result.lockUntil);
@@ -173,9 +161,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         setLoading(false);
       }
     },
-    [Email, Password, Department, router, setUserId]
+    [Email, Password, router, setUserId] // Department removed here
   );
-
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -204,11 +191,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
                   <a
-                    href="#"
+                    href="/reset-password"
                     className="ml-auto text-sm underline-offset-2 hover:underline"
                   >
                     Forgot your password?
                   </a>
+
                 </div>
                 <Input
                   id="password"
@@ -219,28 +207,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </Field>
-              <FieldSet>
-                <FieldLabel htmlFor="department">Department</FieldLabel>
-                <RadioGroup
-                  value={Department}
-                  onValueChange={setDepartment}
-                  aria-label="Department"
-                  required
-                >
-                  <FieldLabel htmlFor="department-sales">
-                    <Field
-                      orientation="horizontal"
-                      className="cursor-pointer p-4 flex items-center justify-between hover:bg-accent transition"
-                    >
-                      <FieldContent>
-                        <FieldTitle>Sales</FieldTitle>
-                        <FieldDescription>Sales Department</FieldDescription>
-                      </FieldContent>
-                      <RadioGroupItem value="Sales" id="department-sales" />
-                    </Field>
-                  </FieldLabel>
-                </RadioGroup>
-              </FieldSet>
+
+              {/* Department section removed */}
 
               <Field>
                 <Button type="submit" disabled={loading} className="w-full">

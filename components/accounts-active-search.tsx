@@ -17,7 +17,7 @@ export function AccountsActiveSearch({
   isFiltering,
 }: AccountsActiveSearchProps) {
   return (
-    <div className="relative w-full sm:w-1/3">
+    <div className="relative w-full">
       <Input
         placeholder="Search accounts..."
         value={globalFilter}

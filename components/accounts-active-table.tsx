@@ -1,65 +1,36 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  ColumnDef,
-  flexRender,
-} from "@tanstack/react-table";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, ColumnDef, flexRender, } from "@tanstack/react-table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem, } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Edit } from "lucide-react";
+import { type DateRange } from "react-day-picker";
+import { AccountDialog } from "./accounts-active-dialog";
+import { toast } from "sonner";
 
 import { AccountsActiveSearch } from "./accounts-active-search";
 import { AccountsActiveFilter } from "./accounts-active-filter";
 import { AccountsActivePagination } from "./accounts-active-pagination";
-import { type DateRange } from "react-day-picker";
-
-import { AccountDialog } from "./accounts-active-dialog";
-import { toast } from "sonner";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { AccountsActiveDeleteDialog } from "./accounts-active-delete-dialog";
+import { TransferDialog } from "./accounts-transfer-dialog";
 
 interface Account {
   id: string;
   referenceid: string;
-  companyname: string;
-  contactperson: string;
-  contactnumber: string;
-  emailaddress: string;
+  company_name: string;
+  contact_person: string;
+  contact_number: string;
+  email_address: string;
   address: string;
-  deliveryaddress: string;
-  area: string;
-  typeclient: string;
-  actualsales: number | string;
+  delivery_address: string;
+  region: string;
+  type_client: string;
   date_created: string;
+  industry: string;
   status?: string;
 }
 
@@ -87,21 +58,20 @@ export function AccountsTable({
   onRefreshAccountsAction
 }: AccountsTableProps) {
   const [localPosts, setLocalPosts] = useState<Account[]>(posts);
-  // Sync localPosts when posts from parent updates
+
   useEffect(() => {
     setLocalPosts(posts);
   }, [posts]);
-
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [isFiltering, setIsFiltering] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
+  const [alphabeticalFilter, setAlphabeticalFilter] = useState<string | null>(null);
 
   // Advanced filters states
   const [dateCreatedFilter, setDateCreatedFilter] = useState<string | null>(null);
-  const [salesVolumeFilter, setSalesVolumeFilter] = useState<string | null>(null);
-  const [referenceIdFilter, setReferenceIdFilter] = useState<string | null>(null);
 
   // For edit dialog
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -111,60 +81,125 @@ export function AccountsTable({
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
   const [removeRemarks, setRemoveRemarks] = useState("");
   const [rowSelection, setRowSelection] = useState<{ [key: string]: boolean }>({});
-
-  // For create dialog
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  
+  // For bulk transfer
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [agents, setAgents] = useState<any[]>([]);
 
   // Filter out removed accounts immediately
   const filteredData = useMemo(() => {
-    return localPosts
-      .filter((item) => item.status !== "Removed") // exclude removed here
-      .filter((item) => {
-        const matchesSearch =
-          !globalFilter ||
-          Object.values(item).some(
-            (val) =>
-              val != null &&
-              String(val).toLowerCase().includes(globalFilter.toLowerCase())
-          );
+    // Allowed type_client values for display
+    const allowedTypes = ["TOP 50", "NEXT 30", "BALANCE 20"];
 
-        const matchesType = typeFilter === "all" || item.typeclient === typeFilter;
+    // Start filtering: status must be "Active" AND type_client must be in allowedTypes
+    let data = localPosts.filter(
+      (item) => item.status === "Active" && allowedTypes.includes(item.type_client)
+    );
 
-        const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+    data = data.filter((item) => {
+      const matchesSearch =
+        !globalFilter ||
+        Object.values(item).some(
+          (val) =>
+            val != null &&
+            String(val).toLowerCase().includes(globalFilter.toLowerCase())
+        );
 
-        return matchesSearch && matchesType && matchesStatus;
-      })
-      .sort((a, b) => {
-        if (dateCreatedFilter === "asc") {
-          return new Date(a.date_created).getTime() - new Date(b.date_created).getTime();
-        } else if (dateCreatedFilter === "desc") {
-          return new Date(b.date_created).getTime() - new Date(a.date_created).getTime();
-        }
-        return 0;
-      })
-      .filter((item) => {
-        if (!salesVolumeFilter) return true;
-        if (salesVolumeFilter === "high") return Number(item.actualsales) > 50000;
-        if (salesVolumeFilter === "low") return Number(item.actualsales) <= 50000;
-        return true;
-      })
-      .filter((item) => {
-        if (!referenceIdFilter) return true;
-        if (referenceIdFilter === "alpha")
-          return /^[A-Za-z]/.test(item.referenceid);
-        if (referenceIdFilter === "numeric")
-          return /^[0-9]/.test(item.referenceid);
-        return true;
-      });
+      // Filtering by selected typeFilter: if 'all' then all allowed types shown,
+      // else only those matching the selected type
+      const matchesType = typeFilter === "all" || item.type_client === typeFilter;
+
+      // Since you want only Active status, you can keep the statusFilter logic for flexibility,
+      // but actual data is already filtered by status === "Active"
+      const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+
+      const matchesIndustry = industryFilter === "all" || item.industry === industryFilter;
+
+      return matchesSearch && matchesType && matchesStatus && matchesIndustry;
+    });
+
+    // Sorting logic unchanged
+    data = data.sort((a, b) => {
+      if (alphabeticalFilter === "asc") {
+        return a.company_name.localeCompare(b.company_name);
+      } else if (alphabeticalFilter === "desc") {
+        return b.company_name.localeCompare(a.company_name);
+      }
+
+      if (dateCreatedFilter === "asc") {
+        return new Date(a.date_created).getTime() - new Date(b.date_created).getTime();
+      } else if (dateCreatedFilter === "desc") {
+        return new Date(b.date_created).getTime() - new Date(a.date_created).getTime();
+      }
+
+      return 0;
+    });
+
+    return data;
   }, [
     localPosts,
     globalFilter,
     typeFilter,
     statusFilter,
+    industryFilter,
+    alphabeticalFilter,
     dateCreatedFilter,
-    salesVolumeFilter,
-    referenceIdFilter,
   ]);
+
+  // Download
+  function convertToCSV(data: Account[]) {
+    if (data.length === 0) return "";
+
+    const header = [
+      "Company Name",
+      "Contact Person",
+      "Contact Number",
+      "Email Address",
+      "Address",
+      "Delivery Address",
+      "Region",
+      "Type of Client",
+      "Industry",
+    ];
+
+    const csvRows = [
+      header.join(","),
+      ...data.map((item) =>
+        [
+          item.company_name,
+          item.contact_person,
+          item.contact_number,
+          item.email_address,
+          item.address,
+          item.delivery_address,
+          item.region,
+          item.type_client,
+          item.industry,
+        ]
+          .map((field) => `"${String(field).replace(/"/g, '""')}"`)
+          .join(",")
+      ),
+    ];
+
+    return csvRows.join("\n");
+  }
+
+  function handleDownloadCSV() {
+    const csv = convertToCSV(filteredData);
+    if (!csv) {
+      toast.error("No data to download.");
+      return;
+    }
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "accounts.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   const columns = useMemo<ColumnDef<Account>[]>(
     () => [
@@ -181,37 +216,41 @@ export function AccountsTable({
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label={`Select account ${row.original.companyname}`}
+            aria-label={`Select account ${row.original.company_name}`}
           />
         ),
         enableSorting: false,
         enableHiding: false,
       },
       {
-        accessorKey: "companyname",
+        accessorKey: "company_name",
         header: "Company Name",
         cell: (info) => info.getValue(),
       },
       {
-        accessorKey: "referenceid",
-        header: "Reference ID",
+        accessorKey: "contact_person",
+        header: "Contact Person",
         cell: (info) => info.getValue(),
       },
       {
-        accessorKey: "typeclient",
-        header: "Type Client",
+        accessorKey: "email_address",
+        header: "Email Address",
         cell: (info) => info.getValue(),
       },
       {
-        accessorKey: "actualsales",
-        header: "Actual Sales",
+        accessorKey: "address",
+        header: "Address",
         cell: (info) => info.getValue(),
       },
       {
-        accessorKey: "date_created",
-        header: "Date Created",
-        cell: (info) =>
-          new Date(info.getValue() as string).toLocaleDateString(),
+        accessorKey: "type_client",
+        header: "Type of Client",
+        cell: (info) => info.getValue(),
+      },
+      {
+        accessorKey: "industry",
+        header: "Industry",
+        cell: (info) => info.getValue(),
       },
       {
         accessorKey: "status",
@@ -224,6 +263,12 @@ export function AccountsTable({
           else if (value === "Inactive") variant = "destructive";
           return <Badge variant={variant}>{value ?? "-"}</Badge>;
         },
+      },
+      {
+        accessorKey: "date_created",
+        header: "Date Created",
+        cell: (info) =>
+          new Date(info.getValue() as string).toLocaleDateString(),
       },
       {
         id: "actions",
@@ -271,7 +316,7 @@ export function AccountsTable({
       rowSelection,
     },
     onRowSelectionChange: setRowSelection,
-    getRowId: (row) => row.id, // <--- This is the key fix to map selection keys to actual IDs
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -281,6 +326,25 @@ export function AccountsTable({
   const selectedAccountIds = Object.keys(rowSelection).filter(
     (id) => rowSelection[id]
   );
+
+  useEffect(() => {
+    if (!userDetails.referenceid) return;
+
+    const fetchAgents = async () => {
+      try {
+        const response = await fetch(`/api/fetch-all-user-transfer?id=${encodeURIComponent(userDetails.referenceid)}`);
+        if (!response.ok) throw new Error("Failed to fetch agents");
+
+        const data = await response.json();
+        setAgents(data);
+      } catch (err) {
+        console.error("Error fetching agents:", err);
+      }
+    };
+
+    fetchAgents();
+  }, [userDetails.referenceid]);
+
 
   // Handle bulk remove action
   async function handleBulkRemove() {
@@ -310,9 +374,9 @@ export function AccountsTable({
         throw new Error(errorData?.error || "Failed to remove accounts");
       }
 
-      toast.success("Accounts removed successfully!");
+      toast.success("Accounts removed successfully! Subject for approval on your Territory Sales Manager.");
 
-      await onRefreshAccountsAction(); // dito tatawag sa page.tsx refreshAccounts
+      await onRefreshAccountsAction();
 
       setRowSelection({});
       setRemoveRemarks("");
@@ -330,50 +394,102 @@ export function AccountsTable({
         return o;
       }
     } catch (e) {
-      // Not a valid JSON
     }
     return null;
+  }
+
+  async function handleBulkTransfer(agentRefId: string, accountIds: string[]) {
+    if (accountIds.length === 0 || !agentRefId) return;
+
+    // Optimistic UI update
+    setLocalPosts((prev) =>
+      prev.map((item) =>
+        accountIds.includes(item.id)
+          ? { ...item, status: "Transferred", referenceid: agentRefId }
+          : item
+      )
+    );
+
+    try {
+      const res = await fetch("/api/com-bulk-transfer-account", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: accountIds,
+          status: "Transferred",
+          newReferenceId: agentRefId,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData?.error || "Failed to transfer accounts");
+      }
+
+      toast.success("Accounts transferred successfully! Need approval from your Territory Sales Manager.");
+      
+      await onRefreshAccountsAction();
+
+      setRowSelection({});
+      setIsTransferDialogOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to transfer accounts");
+    }
   }
 
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <AccountDialog
-          mode="create"
-          userDetails={userDetails}
-          onSaveAction={onSaveAccountAction}
-          open={isCreateDialogOpen}
-          onOpenChangeAction={setIsCreateDialogOpen}
-        />
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* Left side: Add Account + Search */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex-grow w-full max-w-lg">
+            <AccountsActiveSearch
+              globalFilter={globalFilter}
+              setGlobalFilterAction={setGlobalFilter}
+              isFiltering={isFiltering}
+            />
+          </div>
+        </div>
 
-        <AccountsActiveSearch
-          globalFilter={globalFilter}
-          setGlobalFilterAction={setGlobalFilter}
-          isFiltering={isFiltering}
-        />
+        {/* Right side: Filter + Remove (only show Remove if selection > 0) */}
+        <div className="flex items-center gap-3">
+          <AccountsActiveFilter
+            typeFilter={typeFilter}
+            setTypeFilterAction={setTypeFilter}
+            statusFilter={statusFilter}
+            setStatusFilterAction={setStatusFilter}
+            dateCreatedFilter={dateCreatedFilter}
+            setDateCreatedFilterAction={setDateCreatedFilter}
+            industryFilter={industryFilter}
+            setIndustryFilterAction={setIndustryFilter}
+            alphabeticalFilter={alphabeticalFilter}
+            setAlphabeticalFilterAction={setAlphabeticalFilter}
+          />
 
-        <AccountsActiveFilter
-          typeFilter={typeFilter}
-          setTypeFilterAction={setTypeFilter}
-          statusFilter={statusFilter}
-          setStatusFilterAction={setStatusFilter}
-          dateCreatedFilter={dateCreatedFilter}
-          setDateCreatedFilterAction={setDateCreatedFilter}
-          salesVolumeFilter={salesVolumeFilter}
-          setSalesVolumeFilterAction={setSalesVolumeFilter}
-          referenceIdFilter={referenceIdFilter}
-          setReferenceIdFilterAction={setReferenceIdFilter}
-        />
+          <Button variant="outline" onClick={handleDownloadCSV}>
+            Download CSV
+          </Button>
 
-        {/* Remove Selected Button */}
-        <Button
-          variant="destructive"
-          disabled={selectedAccountIds.length === 0}
-          onClick={() => setIsRemoveDialogOpen(true)}
-        >
-          Remove Selected
-        </Button>
+          {selectedAccountIds.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsTransferDialogOpen(true)}
+              >
+                Transfer Selected
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={() => setIsRemoveDialogOpen(true)}
+              >
+                Remove Selected
+              </Button>
+            </>
+          )}
+
+        </div>
       </div>
 
       {/* Table */}
@@ -431,25 +547,25 @@ export function AccountsTable({
           mode="edit"
           initialData={{
             id: editingAccount.id,
-            companyname: editingAccount.companyname,
-            contactperson: typeof editingAccount.contactperson === "string"
-              ? tryParseJSON(editingAccount.contactperson) ?? editingAccount.contactperson.split(",").map((v) => v.trim())
-              : editingAccount.contactperson || [""],
+            company_name: editingAccount.company_name,
+            contact_person: typeof editingAccount.contact_person === "string"
+              ? tryParseJSON(editingAccount.contact_person) ?? editingAccount.contact_person.split(",").map((v) => v.trim())
+              : editingAccount.contact_person || [""],
 
-            contactnumber: typeof editingAccount.contactnumber === "string"
-              ? tryParseJSON(editingAccount.contactnumber) ?? editingAccount.contactnumber.split(",").map((v) => v.trim())
-              : editingAccount.contactnumber || [""],
+            contact_number: typeof editingAccount.contact_number === "string"
+              ? tryParseJSON(editingAccount.contact_number) ?? editingAccount.contact_number.split(",").map((v) => v.trim())
+              : editingAccount.contact_number || [""],
 
-            emailaddress: typeof editingAccount.emailaddress === "string"
-              ? tryParseJSON(editingAccount.emailaddress) ?? editingAccount.emailaddress.split(",").map((v) => v.trim())
-              : editingAccount.emailaddress || [""],
+            email_address: typeof editingAccount.email_address === "string"
+              ? tryParseJSON(editingAccount.email_address) ?? editingAccount.email_address.split(",").map((v) => v.trim())
+              : editingAccount.email_address || [""],
 
             address: editingAccount.address,
-            area: editingAccount.area,
+            region: editingAccount.region,
+            industry: editingAccount.industry,
             status: editingAccount.status ?? "Active",
-            deliveryaddress: editingAccount.deliveryaddress,
-            typeclient: editingAccount.typeclient,
-            actualsales: editingAccount.actualsales,
+            delivery_address: editingAccount.delivery_address,
+            type_client: editingAccount.type_client,
             date_created: editingAccount.date_created,
           }}
           userDetails={userDetails}
@@ -468,44 +584,22 @@ export function AccountsTable({
         />
       )}
 
-      {/* Remove confirmation dialog */}
-      <Dialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Selected Accounts</DialogTitle>
-            <DialogDescription>
-              Please provide remarks/reason for removing the selected accounts.
-            </DialogDescription>
-          </DialogHeader>
+      <AccountsActiveDeleteDialog
+        open={isRemoveDialogOpen}
+        onOpenChange={setIsRemoveDialogOpen}
+        removeRemarks={removeRemarks}
+        setRemoveRemarks={setRemoveRemarks}
+        onConfirmRemove={handleBulkRemove}
+      />
 
-          <textarea
-            className="w-full border rounded p-2 mt-2 mb-4"
-            rows={4}
-            value={removeRemarks}
-            onChange={(e) => setRemoveRemarks(e.target.value)}
-            placeholder="Enter remarks here"
-          />
+      <TransferDialog
+        open={isTransferDialogOpen}
+        onOpenChange={setIsTransferDialogOpen}
+        agents={agents}
+        selectedAccountIds={selectedAccountIds}
+        onConfirmTransfer={handleBulkTransfer}
+      />
 
-          <DialogFooter className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setIsRemoveDialogOpen(false);
-                setRemoveRemarks("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={!removeRemarks.trim()}
-              onClick={handleBulkRemove}
-            >
-              Confirm Remove
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

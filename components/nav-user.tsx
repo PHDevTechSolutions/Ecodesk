@@ -46,9 +46,7 @@ export function NavUser({
   const router = useRouter();
 
   const handleLogout = () => {
-    // Clear user auth info from storage
     localStorage.removeItem("userId");
-    // Redirect to login page
     router.replace("/login");
   };
 

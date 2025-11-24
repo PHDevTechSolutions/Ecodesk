@@ -1,27 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { SidebarLeft } from "@/components/sidebar-left";
 import { SidebarRight } from "@/components/sidebar-right";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger, } from "@/components/ui/sidebar";
+import { type DateRange } from "react-day-picker";
 
 function DashboardContent() {
+  const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<DateRange | undefined>(undefined);
+
   const searchParams = useSearchParams();
   const { userId, setUserId } = useUser();
 
@@ -62,7 +55,11 @@ function DashboardContent() {
           <div className="bg-muted/50 mx-auto h-[100vh] w-full max-w-3xl rounded-xl" />
         </div>
       </SidebarInset>
-      <SidebarRight userId={userId ?? undefined} />
+      <SidebarRight
+        userId={userId ?? undefined}
+        dateCreatedFilterRange={dateCreatedFilterRange}
+        setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+      />
 
     </>
   );

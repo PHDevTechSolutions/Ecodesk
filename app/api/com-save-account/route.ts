@@ -18,6 +18,38 @@ function normalizeField(value: any): string {
   return "";
 }
 
+function getPrefix(companyName: string, region: string) {
+  // First two letters of company name, uppercase
+  const companyPart = companyName.trim().substring(0, 2).toUpperCase();
+
+  // Region uppercase, remove spaces
+  const regionPart = region.trim().toUpperCase().replace(/\s+/g, "");
+
+  return `${companyPart}-${regionPart}`;
+}
+
+async function getNextSequenceNumber(prefix: string) {
+  // Search last highest account_reference_number that starts with prefix + '-'
+  const lastEntry = await Xchire_sql`
+    SELECT account_reference_number
+    FROM accounts
+    WHERE account_reference_number LIKE ${prefix + "-%"}
+    ORDER BY account_reference_number DESC
+    LIMIT 1;
+  `;
+
+  if (lastEntry.length === 0) {
+    return 1; // start from 1 if none found
+  }
+
+  // Extract number part after prefix + '-'
+  const lastNumberStr = lastEntry[0].account_reference_number.substring(prefix.length + 1);
+
+  const lastNumber = parseInt(lastNumberStr, 10);
+  if (isNaN(lastNumber)) return 1;
+  return lastNumber + 1;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -27,29 +59,37 @@ export async function POST(req: Request) {
       referenceid,
       tsm,
       manager,
-      companyname,
-      contactperson,
-      contactnumber,
-      emailaddress,
+      company_name,
+      contact_person,
+      contact_number,
+      email_address,
       address,
-      deliveryaddress,
-      area,
-      typeclient,
+      delivery_address,
+      region,
+      type_client,
       date_created,
+      industry,
       status,
+      company_group
     } = body;
 
-    if (!referenceid || !companyname || !typeclient) {
+    if (!referenceid || !company_name || !type_client || !region) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields: referenceid, companyname, or typeclient." },
+        { success: false, error: "Missing required fields: referenceid, company_name, type_client or region." },
         { status: 400 }
       );
     }
 
+    // Generate account_reference_number
+    const prefix = getPrefix(company_name, region);
+    const nextSeq = await getNextSequenceNumber(prefix);
+    const seqStr = nextSeq.toString().padStart(10, "0");
+    const account_reference_number = `${prefix}-${seqStr}`;
+
     // Normalize array or string fields
-    const normalizedContactPerson = normalizeField(contactperson);
-    const normalizedContactNumber = normalizeField(contactnumber);
-    const normalizedEmailAddress = normalizeField(emailaddress);
+    const normalizedContactPerson = normalizeField(contact_person);
+    const normalizedContactNumber = normalizeField(contact_number);
+    const normalizedEmailAddress = normalizeField(email_address);
 
     // Use current timestamp if date_created not provided or invalid
     const createdDate =
@@ -63,32 +103,38 @@ export async function POST(req: Request) {
         referenceid,
         tsm,
         manager,
-        companyname,
-        contactperson,
-        contactnumber,
-        emailaddress,
+        company_name,
+        contact_person,
+        contact_number,
+        email_address,
         address,
-        deliveryaddress,
-        area,
-        typeclient,
+        delivery_address,
+        region,
+        type_client,
         date_created,
-        status
+        industry,
+        status,
+        company_group,
+        account_reference_number
       )
       VALUES
       (
         ${referenceid},
         ${tsm || null},
         ${manager || null},
-        ${companyname},
+        ${company_name},
         ${normalizedContactPerson || null},
         ${normalizedContactNumber || null},
         ${normalizedEmailAddress || null},
         ${address || null},
-        ${deliveryaddress || null},
-        ${area || null},
-        ${typeclient},
+        ${delivery_address || null},
+        ${region || null},
+        ${type_client},
         ${createdDate},
-        ${status || "Active"}
+        ${industry || null},
+        ${status || "Active"},
+        ${company_group || null},
+        ${account_reference_number}
       )
       RETURNING *;
     `;

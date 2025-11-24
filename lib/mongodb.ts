@@ -75,11 +75,9 @@ const userCache = new Map<string, any>(); // simple in-memory cache (FDT style)
 export async function validateUser({
   Email,
   Password,
-  Department,
 }: {
   Email: string;
   Password: string;
-  Department: string;
 }) {
   // Check cache first (avoid DB hit)
   if (userCache.has(Email)) {

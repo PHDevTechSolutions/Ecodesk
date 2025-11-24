@@ -8,13 +8,11 @@ import { FormatProvider } from "@/contexts/FormatContext";
 import { SidebarLeft } from "@/components/sidebar-left";
 import { SidebarRight } from "@/components/sidebar-right";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertTitle } from "@/components/ui/alert"
+import { AlertCircleIcon } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 
@@ -24,18 +22,19 @@ import { type DateRange } from "react-day-picker";
 interface Account {
   id: string;
   referenceid: string;
-  companyname: string;
-  typeclient: string;
-  actualsales: number | string;
+  company_name: string;
+  type_client: string;
   date_created: string;
   date_updated: string;
-  contactperson: string;
-  contactnumber: string;
-  emailaddress: string;
+  contact_person: string;
+  contact_number: string;
+  email_address: string;
   address: string;
-  deliveryaddress: string;
-  area: string;
+  delivery_address: string;
+  region: string;
+  industry: string;
   status?: string;
+  company_group?: string;
 }
 
 interface UserDetails {
@@ -94,7 +93,7 @@ function DashboardContent() {
         toast.success("User data loaded successfully!");
       } catch (err) {
         console.error("Error fetching user data:", err);
-        setError("Failed to load user data. Please try again later.");
+        toast.error("Failed to connect to server. Please try again later or refresh your network connection");
       } finally {
         setLoadingUser(false);
       }
@@ -125,9 +124,7 @@ function DashboardContent() {
         toast.success("Accounts loaded successfully!");
       } catch (err) {
         console.error("Error fetching accounts:", err);
-        setError("Error fetching accounts. You can still add new accounts.");
-        // **Wag i-clear/setPosts([]) para wag mawala yung table**
-        // setPosts([]); <--- Tanggalin or i-comment ito
+        toast.error("Failed to connect to server. Please try again later or refresh your network connection");
       } finally {
         setLoadingAccounts(false);
       }
@@ -161,20 +158,20 @@ function DashboardContent() {
   async function handleSaveAccount(data: Account & UserDetails) {
     const payload = {
       ...data,
-      contactperson: Array.isArray(data.contactperson)
-        ? data.contactperson
-        : typeof data.contactperson === 'string'
-          ? data.contactperson.split(',').map((v) => v.trim())
+      contactperson: Array.isArray(data.contact_person)
+        ? data.contact_person
+        : typeof data.contact_person === 'string'
+          ? data.contact_person.split(',').map((v) => v.trim())
           : [],
-      contactnumber: Array.isArray(data.contactnumber)
-        ? data.contactnumber
-        : typeof data.contactnumber === 'string'
-          ? data.contactnumber.split(',').map((v) => v.trim())
+      contactnumber: Array.isArray(data.contact_number)
+        ? data.contact_number
+        : typeof data.contact_number === 'string'
+          ? data.contact_number.split(',').map((v) => v.trim())
           : [],
-      emailaddress: Array.isArray(data.emailaddress)
-        ? data.emailaddress
-        : typeof data.emailaddress === 'string'
-          ? data.emailaddress.split(',').map((v) => v.trim())
+      emailaddress: Array.isArray(data.email_address)
+        ? data.email_address
+        : typeof data.email_address === 'string'
+          ? data.email_address.split(',').map((v) => v.trim())
           : [],
     };
 
@@ -211,14 +208,14 @@ function DashboardContent() {
       setPosts(data.data || []);
       toast.success("Accounts loaded successfully!");
     } catch (error) {
-      toast.error("Error fetching accounts.");
+      toast.error("Failed to connect to server. Please try again later or refresh your network connection");
     }
   }
 
   return (
     <>
       <SidebarLeft />
-      <SidebarInset>
+      <SidebarInset className="overflow-hidden">
         <header className="bg-background sticky top-0 flex h-14 shrink-0 items-center gap-2 border-b">
           <div className="flex flex-1 items-center gap-2 px-3">
             <SidebarTrigger />
@@ -240,16 +237,29 @@ function DashboardContent() {
 
         <main className="flex flex-1 flex-col gap-4 p-4 overflow-auto">
           {loadingUser ? (
-            <div className="text-center text-muted-foreground">Loading user data...</div>
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[250px]" />
+                <Skeleton className="h-4 w-[200px]" />
+              </div>
+            </div>
+
           ) : loadingAccounts ? (
-            <div className="text-center text-muted-foreground">Loading accounts...</div>
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[250px]" />
+                <Skeleton className="h-4 w-[200px]" />
+              </div>
+            </div>
           ) : (
             <>
-              {/* Show error message above the table but still show the table */}
               {error && (
-                <div className="mb-2 p-2 bg-yellow-100 text-yellow-800 rounded border border-yellow-300">
-                  {error}
-                </div>
+                <Alert variant="destructive">
+                  <AlertCircleIcon />
+                  <AlertTitle>{error}</AlertTitle>
+                </Alert>
               )}
 
               <AccountsTable

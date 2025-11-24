@@ -1,35 +1,85 @@
-import React, { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
+import { toast } from "sonner";
+
+// Levenshtein Distance (for fuzzy matching)
+function levenshtein(a: string, b: string) {
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      matrix[i][j] =
+        b[i - 1] === a[j - 1]
+          ? matrix[i - 1][j - 1]
+          : Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+// Clean and Normalize Company Name
+function cleanCompanyName(name: string) {
+  if (!name) return "";
+  let n = name.toUpperCase();
+  // Remove special characters: - _ .
+  n = n.replace(/[-_.]/g, "");
+  // Normalize spaces and trim
+  n = n.replace(/\s+/g, " ").trim();
+  // Remove trailing numbers like 1, 2, 001 etc.
+  n = n.replace(/\d+$/g, "");
+  // Final trim after removal
+  n = n.trim();
+  return n;
+}
+
+// List of disallowed abbreviations (case insensitive)
+const disallowedAbbreviations = ["INC", "CORP", "LTD", "CO", "LLC",
+  // add more as needed
+];
+
+// Check if company name contains disallowed abbreviation as a separate word
+function containsDisallowedAbbreviation(name: string) {
+  const words = name.toUpperCase().split(/\s+/);
+  return words.some((word) => disallowedAbbreviations.includes(word));
+}
+
+const INDUSTRY_OPTIONS = [
+  "Manufacturing",
+  "Retail",
+  "Construction",
+  "No Industry",
+];
+
+const TYPECLIENT_OPTIONS = [
+  "TSA CLIENT",
+];
 
 interface AccountFormData {
   id?: string;
-  companyname: string;
-  contactperson: string[];
-  contactnumber: string[];
-  emailaddress: string[];
+  company_name: string;
+  contact_person: string[];
+  contact_number: string[];
+  email_address: string[];
   address: string;
-  area: string;
+  region: string;
   status: string;
-  deliveryaddress: string;
-  typeclient: string;
-  actualsales?: number | string;
+  delivery_address: string;
+  type_client: string;
+  industry: string;
   date_created?: string;
+  company_group: string;
 }
 
 interface UserDetails {
@@ -40,11 +90,19 @@ interface UserDetails {
 
 interface AccountDialogProps {
   mode: "create" | "edit";
-  initialData?: Partial<AccountFormData>;
   userDetails: UserDetails;
+  initialData?: Partial<AccountFormData>;
   onSaveAction: (data: AccountFormData & UserDetails) => void;
   open: boolean;
   onOpenChangeAction: (open: boolean) => void;
+}
+
+interface DuplicateCheckResponse {
+  exists: boolean;
+  companies: Array<{
+    company_name: string;
+    owner_referenceid: string;
+  }>;
 }
 
 export function AccountDialog({
@@ -56,118 +114,176 @@ export function AccountDialog({
   onOpenChangeAction,
 }: AccountDialogProps) {
   const [formData, setFormData] = useState<AccountFormData>({
-    companyname: "",
-    contactperson: [],
-    contactnumber: [],
-    emailaddress: [],
+    company_name: "",
+    contact_person: [""],
+    contact_number: [""],
+    email_address: [""],
     address: "",
-    area: "",
-    status: "Active",
-    deliveryaddress: "",
-    typeclient: "",
+    region: "",
+    status: "Pending",
+    delivery_address: "",
+    type_client: "Choose Type Client",
+    industry: "Choose Industry",
+    company_group: "",
     ...initialData,
   });
 
+  const [companyError, setCompanyError] = useState("");
+  const [duplicateInfo, setDuplicateInfo] = useState<
+    Array<{ company_name: string; owner_referenceid: string }>
+  >([]);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+  const submitLock = useRef(false);
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    if (initialData) {
-      setFormData((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          Object.entries(initialData).map(([key, value]) => {
-            if (
-              ["contactperson", "contactnumber", "emailaddress"].includes(key) &&
-              typeof value === "string"
-            ) {
-              // Try to parse JSON string first
-              try {
-                return [key, JSON.parse(value)];
-              } catch {
-                // fallback: split by comma if not valid JSON
-                return [key, value.split(",").map((v) => v.trim()).filter(Boolean)];
-              }
-            }
-            return [key, value ?? ""];
-          })
-        ),
-      }));
+    if (mode === "edit") {
+      setCompanyError("");
+      setDuplicateInfo([]);
+      setIsCheckingDuplicate(false);
+      return;
     }
-  }, [initialData]);
 
-  function handleArrayChange(
-    field: "contactperson" | "contactnumber" | "emailaddress",
-    index: number,
-    value: string
-  ) {
-    setFormData((prev) => {
-      const updatedArray = [...prev[field]];
-      updatedArray[index] = value;
-      return { ...prev, [field]: updatedArray };
-    });
-  }
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
 
-  function handleAddEntry(field: "contactperson" | "contactnumber" | "emailaddress") {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: [...prev[field], ""],
-    }));
-  }
+    debounceTimeout.current = setTimeout(() => {
+      const name = formData.company_name.trim();
 
-  function handleRemoveEntry(
-    field: "contactperson" | "contactnumber" | "emailaddress",
-    index: number
-  ) {
-    setFormData((prev) => {
-      const updatedArray = [...prev[field]];
-      if (updatedArray.length === 1) return prev; // keep at least 1 input visible
-      updatedArray.splice(index, 1);
-      return { ...prev, [field]: updatedArray };
-    });
-  }
+      if (!name || name.length < 3) {
+        setCompanyError("Company Name must be at least 3 characters.");
+        setDuplicateInfo([]);
+        return;
+      }
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  }
+      const cleaned = cleanCompanyName(name);
+
+      if (["NONE", "N/A", "OTHER"].includes(cleaned)) {
+        setCompanyError("Company Name Invalid.");
+        setDuplicateInfo([]);
+        return;
+      }
+
+      if (cleaned.startsWith("#")) {
+        setCompanyError("Company names starting with # require supporting documents.");
+        setDuplicateInfo([]);
+        return;
+      }
+
+      // New check for disallowed abbreviations
+      if (containsDisallowedAbbreviation(cleaned)) {
+        setCompanyError(
+          "Company name cannot contain abbreviations like INC, CORP, LTD, etc. Please use full words."
+        );
+        setDuplicateInfo([]);
+        return;
+      }
+
+      setIsCheckingDuplicate(true);
+
+      const controller = new AbortController();
+      const signal = controller.signal;
+
+      fetch(`/api/com-check-duplicate-account?company_name=${encodeURIComponent(cleaned)}`, { signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to check duplicates");
+          const data: DuplicateCheckResponse = await res.json();
+
+          if (data.exists && data.companies.length > 0) {
+            // Filter companies with fuzzy distance <= 2
+            const similarCompanies = data.companies.filter((c) => {
+              const dist = levenshtein(cleaned, cleanCompanyName(c.company_name));
+              return dist <= 2;
+            });
+
+            if (similarCompanies.length > 0) {
+              // Check if owned by others
+              const otherOwner = similarCompanies.find(
+                (c) => c.owner_referenceid !== userDetails.referenceid
+              );
+
+              if (otherOwner) {
+                setCompanyError(
+                  `Duplicate company owned by another TSA (RefID: ${otherOwner.owner_referenceid})`
+                );
+              } else {
+                setCompanyError(
+                  `Possible duplicate detected (owned by you): "${similarCompanies[0].company_name}"`
+                );
+              }
+              setDuplicateInfo(similarCompanies);
+            } else {
+              setCompanyError("");
+              setDuplicateInfo([]);
+            }
+          } else {
+            setCompanyError("");
+            setDuplicateInfo([]);
+          }
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            console.error("Duplicate check failed:", err);
+            setCompanyError("Failed to validate company name");
+            setDuplicateInfo([]);
+          }
+        })
+        .finally(() => setIsCheckingDuplicate(false));
+
+      return () => controller.abort();
+    }, 500); // debounce delay 500ms
+
+    return () => {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    };
+  }, [formData.company_name, userDetails.referenceid, mode]);
 
   function handleSubmit() {
-    const cleanArray = (arr: string[]) => arr.map(v => v.trim()).filter((v) => v !== "");
+    if (submitLock.current) return;
+    submitLock.current = true;
 
-    const fullData = {
+    if (companyError) {
+      toast.error(companyError);
+      submitLock.current = false;
+      return;
+    }
+
+    const cleanData = {
       ...formData,
-      contactperson: cleanArray(formData.contactperson),
-      contactnumber: cleanArray(formData.contactnumber),
-      emailaddress: cleanArray(formData.emailaddress),
+      company_name: cleanCompanyName(formData.company_name),
+      contact_person: formData.contact_person.map((v) => v.trim()).filter(Boolean),
+      contact_number: formData.contact_number.map((v) => v.trim()).filter(Boolean),
+      email_address: formData.email_address.map((v) => v.trim()).filter(Boolean),
       referenceid: userDetails.referenceid,
       tsm: userDetails.tsm,
       manager: userDetails.manager,
+      status: mode === "create" ? "Pending" : formData.status,
     };
 
-    console.log("Submitting form with cleaned data:", fullData);
-    onSaveAction(fullData);
+    onSaveAction(cleanData);
+
+    setTimeout(() => {
+      submitLock.current = false;
+    }, 1500);
+
     onOpenChangeAction(false);
   }
-  
 
   return (
     <Dialog open={open} onOpenChange={onOpenChangeAction}>
       {mode === "create" && (
         <DialogTrigger asChild>
-          <Button variant="default">Add Account</Button>
+          <Button>Add Account</Button>
         </DialogTrigger>
       )}
 
       <DialogContent
-        style={{ maxWidth: "900px", width: "90vw", maxHeight: "85vh", overflowY: "auto" }}
+        className="w-full max-w-[1280px] max-h-[85vh] overflow-y-auto"
+        style={{ width: "40vw", maxWidth: "1600px", minWidth: "600px" }}
       >
+
         <DialogHeader>
-          <DialogTitle>
-            {mode === "create" ? "Create New Account" : "Edit Account"}
-          </DialogTitle>
-          <DialogDescription>
-            Please fill out the account information below.
-          </DialogDescription>
+          <DialogTitle>{mode === "create" ? "Create New Account" : "Edit Account"}</DialogTitle>
+          <DialogDescription>Fill out the account details below.</DialogDescription>
         </DialogHeader>
 
         <form
@@ -177,38 +293,79 @@ export function AccountDialog({
           }}
           className="grid grid-cols-2 gap-6 mt-4"
         >
+          {/* Company Name */}
           <div className="col-span-2">
-            <Input
-              required
-              name="companyname"
-              value={formData.companyname ?? ""}
-              onChange={handleChange}
-              placeholder="Company Name"
-            />
+            {mode === "edit" ? (
+              <>
+                <p className="uppercase font-semibold">{formData.company_name}</p>
+                <input type="hidden" value={formData.company_name} />
+              </>
+            ) : (
+              <Input
+                required
+                value={formData.company_name}
+                onChange={(e) => setFormData((prev) => ({ ...prev, company_name: e.target.value }))}
+                placeholder="Company Name"
+                className="uppercase"
+              />
+            )}
+            {companyError && <p className="text-red-500 text-sm mt-1">{companyError}</p>}
+            {isCheckingDuplicate && <p className="text-gray-500 text-xs">Checking duplicates...</p>}
+
+            {duplicateInfo.length > 0 && (
+              <div className="mt-2 text-sm">
+                <p>Possible duplicates:</p>
+                <ul className="list-disc ml-5">
+                  {duplicateInfo.map((dup, idx) => (
+                    <li key={idx}>
+                      {dup.company_name} — Owner RefID: {dup.owner_referenceid}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Contact Person(s) */}
           <div>
             <label className="font-semibold mb-2 block">Contact Person(s)</label>
-            {formData.contactperson.map((cp, i) => (
+            {formData.contact_person.map((cp, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <Input
                   required
                   value={cp}
-                  onChange={(e) => handleArrayChange("contactperson", i, e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => {
+                      const copy = [...prev.contact_person];
+                      copy[i] = val;
+                      return { ...prev, contact_person: copy };
+                    });
+                  }}
                   placeholder="Contact Person"
                 />
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={() => handleRemoveEntry("contactperson", i)}
-                  disabled={formData.contactperson.length === 1}
+                  onClick={() => {
+                    if (formData.contact_person.length > 1) {
+                      setFormData((prev) => {
+                        const copy = [...prev.contact_person];
+                        copy.splice(i, 1);
+                        return { ...prev, contact_person: copy };
+                      });
+                    }
+                  }}
+                  disabled={formData.contact_person.length === 1}
                 >
                   Remove
                 </Button>
               </div>
             ))}
-            <Button type="button" onClick={() => handleAddEntry("contactperson")}>
+            <Button
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, contact_person: [...prev.contact_person, ""] }))}
+            >
               Add Contact Person
             </Button>
           </div>
@@ -216,25 +373,43 @@ export function AccountDialog({
           {/* Contact Number(s) */}
           <div>
             <label className="font-semibold mb-2 block">Contact Number(s)</label>
-            {formData.contactnumber.map((cn, i) => (
+            {formData.contact_number.map((cn, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <Input
                   required
                   value={cn}
-                  onChange={(e) => handleArrayChange("contactnumber", i, e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => {
+                      const copy = [...prev.contact_number];
+                      copy[i] = val;
+                      return { ...prev, contact_number: copy };
+                    });
+                  }}
                   placeholder="Contact Number"
                 />
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={() => handleRemoveEntry("contactnumber", i)}
-                  disabled={formData.contactnumber.length === 1}
+                  onClick={() => {
+                    if (formData.contact_number.length > 1) {
+                      setFormData((prev) => {
+                        const copy = [...prev.contact_number];
+                        copy.splice(i, 1);
+                        return { ...prev, contact_number: copy };
+                      });
+                    }
+                  }}
+                  disabled={formData.contact_number.length === 1}
                 >
                   Remove
                 </Button>
               </div>
             ))}
-            <Button type="button" onClick={() => handleAddEntry("contactnumber")}>
+            <Button
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, contact_number: [...prev.contact_number, ""] }))}
+            >
               Add Contact Number
             </Button>
           </div>
@@ -242,90 +417,151 @@ export function AccountDialog({
           {/* Email Address(es) */}
           <div>
             <label className="font-semibold mb-2 block">Email Address(es)</label>
-            {formData.emailaddress.map((em, i) => (
+            {formData.email_address.map((em, i) => (
               <div key={i} className="flex gap-2 mb-2">
                 <Input
                   required
                   type="email"
                   value={em}
-                  onChange={(e) => handleArrayChange("emailaddress", i, e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => {
+                      const copy = [...prev.email_address];
+                      copy[i] = val;
+                      return { ...prev, email_address: copy };
+                    });
+                  }}
                   placeholder="Email Address"
                 />
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={() => handleRemoveEntry("emailaddress", i)}
-                  disabled={formData.emailaddress.length === 1}
+                  onClick={() => {
+                    if (formData.email_address.length > 1) {
+                      setFormData((prev) => {
+                        const copy = [...prev.email_address];
+                        copy.splice(i, 1);
+                        return { ...prev, email_address: copy };
+                      });
+                    }
+                  }}
+                  disabled={formData.email_address.length === 1}
                 >
                   Remove
                 </Button>
               </div>
             ))}
-            <Button type="button" onClick={() => handleAddEntry("emailaddress")}>
+            <Button
+              type="button"
+              onClick={() => setFormData((prev) => ({ ...prev, email_address: [...prev.email_address, ""] }))}
+            >
               Add Email Address
             </Button>
           </div>
 
-          {/* Rest of the fields */}
+          {/* Address */}
           <div>
             <Input
               required
               name="address"
-              value={formData.address ?? ""}
-              onChange={handleChange}
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="Address"
             />
           </div>
+
+          {/* Delivery Address */}
           <div>
             <Input
               required
-              name="deliveryaddress"
-              value={formData.deliveryaddress ?? ""}
-              onChange={handleChange}
+              name="delivery_address"
+              value={formData.delivery_address}
+              onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
               placeholder="Delivery Address"
             />
           </div>
+
+          {/* Region */}
           <div>
             <Input
               required
-              name="area"
-              value={formData.area ?? ""}
-              onChange={handleChange}
-              placeholder="Area"
-            />
-          </div>
-          <div>
-            <Input
-              required
-              name="typeclient"
-              value={formData.typeclient ?? ""}
-              onChange={handleChange}
-              placeholder="Type Client"
+              name="region"
+              value={formData.region}
+              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+              placeholder="Region"
             />
           </div>
 
-          <div className="col-span-2">
+          {/* Type Client */}
+          <div>
             <Select
-              name="status"
-              value={formData.status ?? ""}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, status: value }))
-              }
+              value={formData.type_client}
+              onValueChange={(value) => setFormData({ ...formData, type_client: value })}
+            >
+              <SelectTrigger className="w-full">
+                <span>{formData.type_client}</span>
+              </SelectTrigger>
+              <SelectContent>
+                {TYPECLIENT_OPTIONS.map((type_client) => (
+                  <SelectItem key={type_client} value={type_client}>
+                    {type_client}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Industry */}
+          <div>
+            <Select
+              value={formData.industry}
+              onValueChange={(value) => setFormData({ ...formData, industry: value })}
+            >
+              <SelectTrigger className="w-full">
+                <span>{formData.industry}</span>
+              </SelectTrigger>
+              <SelectContent>
+                {INDUSTRY_OPTIONS.map((industry) => (
+                  <SelectItem key={industry} value={industry}>
+                    {industry}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Company Group */}
+          <div>
+            <Input
+              required
+              name="company_group"
+              value={formData.company_group}
+              onChange={(e) => setFormData({ ...formData, company_group: e.target.value })}
+              placeholder="Group / Affiliate"
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <Select
+              value={formData.status}
+              onValueChange={(value) => setFormData({ ...formData, status: value })}
             >
               <SelectTrigger className="w-full">
                 <span>{formData.status}</span>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
                 <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {/* Submit */}
           <div className="col-span-2 flex justify-end">
             <DialogFooter>
-              <Button type="submit">{mode === "create" ? "Create" : "Save"}</Button>
+              <Button type="submit" disabled={!!companyError || isCheckingDuplicate}>
+                {mode === "create" ? "Create" : "Save"}
+              </Button>
             </DialogFooter>
           </div>
         </form>
