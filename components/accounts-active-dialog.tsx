@@ -444,7 +444,11 @@ export function AccountDialog({
               />
             )}
             {companyError && (
-              <p className="text-red-500 text-sm mt-1">{companyError}</p>
+              <Alert variant="destructive" className="mt-3">
+                <AlertCircleIcon />
+                <AlertTitle>{companyError}</AlertTitle>
+
+              </Alert>
             )}
             {isCheckingDuplicate && (
               <p className="text-gray-500 text-xs">Checking duplicates...</p>
