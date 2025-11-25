@@ -8,7 +8,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, } from "@/components/
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircleIcon } from "lucide-react"; // or wherever your icon is from
+import { AlertCircleIcon, PlusIcon, MinusIcon } from "lucide-react";
 
 // Levenshtein Distance for fuzzy matching duplicates
 function levenshtein(a: string, b: string) {
@@ -500,7 +500,7 @@ export function AccountDialog({
                   }}
                   disabled={formData.contact_person.length === 1}
                 >
-                  Remove
+                  <MinusIcon />
                 </Button>
               </div>
             ))}
@@ -513,7 +513,7 @@ export function AccountDialog({
                 }))
               }
             >
-              Add Contact Person
+              <PlusIcon /> Add
             </Button>
           </div>
 
@@ -548,7 +548,7 @@ export function AccountDialog({
                   }}
                   disabled={formData.contact_number.length === 1}
                 >
-                  Remove
+                  <MinusIcon />
                 </Button>
               </div>
             ))}
@@ -561,7 +561,7 @@ export function AccountDialog({
                 }))
               }
             >
-              Add Contact Number
+              <PlusIcon /> Add
             </Button>
           </div>
 
@@ -604,7 +604,7 @@ export function AccountDialog({
                     }}
                     disabled={formData.email_address.length === 1}
                   >
-                    Remove
+                    <MinusIcon />
                   </Button>
                 </div>
               );
@@ -618,7 +618,7 @@ export function AccountDialog({
                 }))
               }
             >
-              Add Email Address
+              <PlusIcon /> Add
             </Button>
           </div>
 
