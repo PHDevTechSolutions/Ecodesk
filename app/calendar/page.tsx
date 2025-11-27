@@ -46,6 +46,7 @@ interface Account {
 }
 
 interface UserDetails {
+  userid: string;
   referenceid: string;
   tsm: string;
   manager: string;
@@ -58,8 +59,8 @@ function DashboardContent() {
   const queryUserId = searchParams?.get("id") ?? "";
 
   const { userId, setUserId } = useUser();
-
   const [userDetails, setUserDetails] = useState<UserDetails>({
+    userid: "",
     referenceid: "",
     tsm: "",
     manager: "",
@@ -98,6 +99,7 @@ function DashboardContent() {
         const data = await response.json();
 
         setUserDetails({
+          userid: data._id,
           referenceid: data.ReferenceID || "",
           tsm: data.TSM || "",
           manager: data.Manager || "",
@@ -177,7 +179,7 @@ function DashboardContent() {
               )}
 
               <div>
-                <SimpleCalendar referenceid={userDetails.referenceid} />
+                <SimpleCalendar userId={userDetails.userid} referenceid={userDetails.referenceid} />
               </div>
             </>
           )}

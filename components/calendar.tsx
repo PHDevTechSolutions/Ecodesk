@@ -28,7 +28,9 @@ interface EventItem {
 
 interface SimpleCalendarProps {
   referenceid: string;
+  userId: string;
 }
+
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -81,7 +83,7 @@ function eventsByHour(events: EventItem[]) {
   return map;
 }
 
-export function SimpleCalendar({ referenceid }: SimpleCalendarProps) {
+export function SimpleCalendar({ referenceid, userId }: SimpleCalendarProps) {
   const now = React.useMemo(() => new Date(), []);
   const [currentYear, setCurrentYear] = React.useState(now.getFullYear());
   const [currentMonth, setCurrentMonth] = React.useState(now.getMonth());
@@ -138,7 +140,7 @@ export function SimpleCalendar({ referenceid }: SimpleCalendarProps) {
 
     const meetingQuery = query(
       collection(db, "meetings"),
-      where("referenceid", "==", referenceid),
+      where("userId", "==", userId),
       orderBy("start_date")
     );
     const unsubscribeMeetings = onSnapshot(meetingQuery, (snapshot) => {
