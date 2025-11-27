@@ -5,10 +5,24 @@ import { MeetingDialog } from "@/components/activity-planner-meeting-dialog";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, } from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, Timestamp, deleteDoc, doc, addDoc, } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  where,
+  Timestamp,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { toast } from "sonner";
 
 interface MeetingItem {
@@ -34,12 +48,16 @@ export function Meeting({ referenceid, tsm, manager }: MeetingProps) {
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch meetings
+  // Fetch meetings filtered by referenceid prop
   useEffect(() => {
     async function fetchMeetings() {
       setLoading(true);
       try {
-        const q = query(collection(db, "meetings"), orderBy("date_created", "desc"));
+        const q = query(
+          collection(db, "meetings"),
+          where("referenceid", "==", referenceid),
+          orderBy("date_created", "desc")
+        );
         const querySnapshot = await getDocs(q);
 
         const fetchedMeetings = querySnapshot.docs.map((doc) => {
@@ -67,7 +85,7 @@ export function Meeting({ referenceid, tsm, manager }: MeetingProps) {
     }
 
     fetchMeetings();
-  }, []);
+  }, [referenceid]);
 
   // Delete meeting handler
   const handleDeleteMeeting = async (id: string) => {
@@ -131,9 +149,15 @@ export function Meeting({ referenceid, tsm, manager }: MeetingProps) {
                   {type_activity} — {start_date} to {end_date}
                 </AccordionTrigger>
                 <AccordionContent className="flex flex-col gap-2">
-                  <p className="text-[10px]"><strong>Remarks:</strong> {remarks}</p>
-                  <p className="text-[10px]"><strong>Start Date:</strong> {start_date}</p>
-                  <p className="text-[10px]"><strong>End Date:</strong> {end_date}</p>
+                  <p className="text-[10px]">
+                    <strong>Remarks:</strong> {remarks}
+                  </p>
+                  <p className="text-[10px]">
+                    <strong>Start Date:</strong> {start_date}
+                  </p>
+                  <p className="text-[10px]">
+                    <strong>End Date:</strong> {end_date}
+                  </p>
                   <div className="mt-2">
                     <Button
                       variant="ghost"
