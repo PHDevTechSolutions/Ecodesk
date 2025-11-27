@@ -70,6 +70,7 @@ const data = {
       emoji: "💼",
       pages: [
         { name: "Activity Planner", url: "/activity/planner", emoji: "🎯" },
+        { name: "Task List", url: "/activity/tasklist", emoji: "✍️" },
         { name: "Manual Task", url: "#", emoji: "✍️" },
         { name: "Notes", url: "/activity/notes", emoji: "📝" },
         { name: "Quotation", url: "#", emoji: "💬" },
