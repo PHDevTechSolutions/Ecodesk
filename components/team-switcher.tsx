@@ -21,17 +21,17 @@ export function TeamSwitcher({
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton className="w-full px-2 py-1.5">
-          <div className="flex items-center mr-2">
+        <SidebarMenuButton className="w-full">
+          <div className="flex items-center space-x-3">
             <Image
               src="/Taskflow.png"
               alt="Taskflow Logo"
               width={28}
               height={28}
-              className="rounded-sm"
+              className="rounded-full"
             />
+            <span className="truncate font-medium">{activeTeam.name}</span>
           </div>
-          <span className="truncate font-medium">{activeTeam.name}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>

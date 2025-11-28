@@ -427,7 +427,7 @@ export const TaskList: React.FC<CompletedProps> = ({
 
             {/* Activities list */}
             {filteredActivities.length > 0 && (
-                <div className="max-h-[400px] overflow-auto space-y-8 custom-scrollbar">
+                <div className="overflow-auto space-y-8 custom-scrollbar">
                     <Accordion type="single" collapsible className="w-full">
                         {filteredActivities.map((item) => {
                             let badgeColor: "default" | "secondary" | "destructive" | "outline" =

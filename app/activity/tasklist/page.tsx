@@ -12,7 +12,6 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/c
 import { Alert, AlertTitle } from "@/components/ui/alert"
 import { AlertCircleIcon } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
@@ -179,18 +178,11 @@ function DashboardContent() {
                             )}
 
                             <div>
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>List of Task</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <TaskList
-                                            referenceid={userDetails.referenceid}
-                                            target_quota={userDetails.target_quota}
-                                            dateCreatedFilterRange={dateCreatedFilterRange}
-                                            setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />
-                                    </CardContent>
-                                </Card>
+                                <TaskList
+                                    referenceid={userDetails.referenceid}
+                                    target_quota={userDetails.target_quota}
+                                    dateCreatedFilterRange={dateCreatedFilterRange}
+                                    setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />
                             </div>
                         </>
                     )}

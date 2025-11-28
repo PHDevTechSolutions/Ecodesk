@@ -16,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 
-import { Notes } from "@/components/activity-planner-notes";
+import { CCG } from "@/components/activity-planner-ccg";
 
 import { type DateRange } from "react-day-picker";
 
@@ -143,7 +143,7 @@ function DashboardContent() {
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage className="line-clamp-1">Personal Notes</BreadcrumbPage>
+                                    <BreadcrumbPage className="line-clamp-1">CCG - Client Coverage Guide</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
@@ -178,13 +178,11 @@ function DashboardContent() {
                             )}
 
                             <div>
-                                <Notes
+                                <CCG
                                     referenceid={userDetails.referenceid}
-                                    tsm={userDetails.tsm}
-                                    manager={userDetails.manager}
+                                    target_quota={userDetails.target_quota}
                                     dateCreatedFilterRange={dateCreatedFilterRange}
-                                    setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
-                                />
+                                    setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />
                             </div>
                         </>
                     )}
