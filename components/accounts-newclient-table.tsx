@@ -89,14 +89,16 @@ export function AccountsTable({
     const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
     const [agents, setAgents] = useState<any[]>([]);
 
-    // Filter out removed accounts immediately
     const filteredData = useMemo(() => {
-        // Allowed type_client values for display
+        // Allowed type_client values for display (normalize to lowercase)
         const allowedTypes = ["TSA CLIENT", "CSR CLIENT"];
+        const normalizedAllowedTypes = allowedTypes.map(t => t.toLowerCase());
 
-        // Start filtering, exclude removed
+        // Start filtering, exclude removed (case-insensitive)
         let data = localPosts.filter(
-            (item) => item.status !== "Removed" && allowedTypes.includes(item.type_client)
+            (item) =>
+                item.status?.toLowerCase() !== "removed" &&
+                normalizedAllowedTypes.includes(item.type_client?.toLowerCase() ?? "")
         );
 
         data = data.filter((item) => {
@@ -108,13 +110,19 @@ export function AccountsTable({
                         String(val).toLowerCase().includes(globalFilter.toLowerCase())
                 );
 
-            // Filtering by selected typeFilter: if 'all' then all allowed types shown,
-            // else only those matching the selected type
+            // Filter by selected typeFilter (case-insensitive)
             const matchesType =
-                typeFilter === "all" || item.type_client === typeFilter;
+                typeFilter === "all" ||
+                (item.type_client?.toLowerCase() === typeFilter.toLowerCase());
 
-            const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-            const matchesIndustry = industryFilter === "all" || item.industry === industryFilter;
+            // Filter by statusFilter (case-insensitive)
+            const matchesStatus =
+                statusFilter === "all" ||
+                (item.status?.toLowerCase() === statusFilter.toLowerCase());
+
+            // Industry filter (case-sensitive; adjust if needed)
+            const matchesIndustry =
+                industryFilter === "all" || item.industry === industryFilter;
 
             return matchesSearch && matchesType && matchesStatus && matchesIndustry;
         });
@@ -146,7 +154,6 @@ export function AccountsTable({
         alphabeticalFilter,
         dateCreatedFilter,
     ]);
-
 
     // Download
     function convertToCSV(data: Account[]) {
