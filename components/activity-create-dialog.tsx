@@ -395,24 +395,40 @@ export function CreateActivityDialog({
             toast.success("Activity created and status updated successfully!");
 
             if (typeActivity === "Quotation Preparation") {
-                const descriptionTable = 
-                `<table>
-                <tr><td>${productTitle || ""}</td></tr>
-                <tr><td>${productSku || ""}</td></tr>
-                <tr><td>${productDescription || ""}</td></tr>
-                </table>
-                `;
+                // Split comma-separated fields into arrays
+                const productCats = productCat ? productCat.split(",") : [];
+                const quantities = productQuantity ? productQuantity.split(",") : [];
+                const amounts = productAmount ? productAmount.split(",") : [];
+                const photos = productPhoto ? productPhoto.split(",") : [];
+                const titles = productTitle ? productTitle.split(",") : [];
+                const skus = productSku ? productSku.split(",") : [];
+                // For descriptions, using "||" as separator as per your original code
+                const descriptions = productDescription ? productDescription.split("||") : [];
 
-                const items = [
-                    {
-                        itemNo: 1,
-                        qty: Number(productQuantity),
-                        referencePhoto: productPhoto || "",
+                // Map into items array
+                const items = productCats.map((_, index) => {
+                    const qty = Number(quantities[index] || 0);
+                    const amount = Number(amounts[index] || 0);
+                    const photo = photos[index] || "";
+                    const title = titles[index] || "";
+                    const sku = skus[index] || "";
+                    const description = descriptions[index] || "";
+
+                    const descriptionTable = `<table>
+          <tr><td>${title}</td></tr>
+          <tr><td>${sku}</td></tr>
+          <tr><td>${description}</td></tr>
+        </table>`;
+
+                    return {
+                        itemNo: index + 1,
+                        qty,
+                        referencePhoto: photo,
                         description: descriptionTable,
-                        unitPrice: Number(productAmount) / Number(productQuantity || 1),
-                        totalAmount: Number(productAmount),
-                    },
-                ];
+                        unitPrice: qty > 0 ? amount / qty : 0,
+                        totalAmount: amount,
+                    };
+                });
 
                 const quotationData = {
                     referenceNo: quotationNumber || activityRef,
@@ -423,7 +439,7 @@ export function CreateActivityDialog({
                     email: email_address,
                     attention: `${contact_person}, ${address}`,
                     subject: "Quotation Subject",
-                    items,
+                    items, // multiple items here
                     vatType: "Vat Inc",
                     totalPrice: Number(quotationAmount),
                 };
@@ -453,7 +469,6 @@ export function CreateActivityDialog({
             setLoading(false);
         }
     };
-
 
     // Intercept sheet close request:
     const onSheetOpenChange = (open: boolean) => {
