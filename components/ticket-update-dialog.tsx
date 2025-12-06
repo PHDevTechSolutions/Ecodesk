@@ -36,6 +36,7 @@ import { TicketSheet } from "./sheet-ticket";
 
 interface Activity {
   _id: string;
+  ticket_reference_number: string;
   client_segment: string;
   traffic: string;
   source_company: string;
@@ -72,6 +73,7 @@ interface Activity {
 interface UpdateActivityDialogProps {
   onCreated: (newActivity: Activity) => void;
   _id: string;
+  ticket_reference_number: string;
   referenceid: string;
   type_client: string;
   contact_number: string;
@@ -131,9 +133,16 @@ function SpinnerEmpty({ onCancel }: { onCancel?: () => void }) {
   );
 }
 
+function generateTicketReferenceNumber() {
+  const randomNumber = Math.floor(Math.random() * 10 ** 11); // 11 digits max
+  const paddedNumber = randomNumber.toString().padStart(11, "0");
+  return `CSR-Ticket-${paddedNumber}`;
+}
+
 export function UpdateTicketDialog({
   onCreated,
   _id,
+  ticket_reference_number,
   referenceid,
   type_client,
   contact_number,
@@ -176,7 +185,7 @@ export function UpdateTicketDialog({
   const [step, setStep] = useState(1);
 
   const [activityRef, setActivityRef] = useState(_id);
-
+  const [ticketReferenceNumber, setTicketReferenceNumber] = useState("");
   const [clientSegment, setClientSegment] = useState("");
   const [trafficState, setTraffic] = useState("");
   const [sourceCompanyState, setSourceCompany] = useState("");
@@ -281,69 +290,109 @@ export function UpdateTicketDialog({
     setDateCreated(new Date().toISOString());
   }, []);
 
+  useEffect(() => {
+    if (ticket_reference_number) {
+      setTicketReferenceNumber(ticket_reference_number);
+    } else {
+      // Auto generate if empty
+      setTicketReferenceNumber(generateTicketReferenceNumber());
+    }
+  }, [ticket_reference_number]);
+
+
   const handleUpdate = async () => {
-    setLoading(true);
+  setLoading(true);
 
-    const newActivity: Activity = {
-      _id: activityRef,
-      client_segment: clientSegment,
-      traffic: trafficState,
-      source_company: sourceCompanyState,
-      ticket_received: ticketReceivedState,
-      ticket_endorsed: ticketEndorsedState,
-      channel: channelState,
-      wrap_up: wrapUpState,
-      source: sourceState,
-      customer_type: customerTypeState,
-      customer_status: customerStatusState,
-      status: statusState,
-      department: departmentState,
-      manager: managerState,
-      agent: agentState,
-      remarks: remarksState,
-      inquiry: inquiryState,
-      item_code: itemCodeState,
-      item_description: itemDescriptionState,
-      po_number: poNumberState,
-      so_date: soDateState,
-      so_number: soNumberState,
-      so_amount: soAmountState,
-      quotation_number: quotationNumberState,
-      quotation_amount: quotationAmountState,
-      qty_sold: qtySoldState,
-      payment_terms: paymentTermsState,
-      po_source: poSourceState,
-      payment_date: paymentDateState,
-      delivery_date: deliveryDateState,
-      date_created: dateCreatedState,
-      date_updated: new Date().toISOString(),
-    };
+  const newActivity: Activity = {
+    _id: activityRef,
+    ticket_reference_number: ticketReferenceNumber,
+    client_segment: clientSegment,
+    traffic: trafficState,
+    source_company: sourceCompanyState,
+    ticket_received: ticketReceivedState,
+    ticket_endorsed: ticketEndorsedState,
+    channel: channelState,
+    wrap_up: wrapUpState,
+    source: sourceState,
+    customer_type: customerTypeState,
+    customer_status: customerStatusState,
+    status: statusState,
+    department: departmentState,
+    manager: managerState,
+    agent: agentState,
+    remarks: remarksState,
+    inquiry: inquiryState,
+    item_code: itemCodeState,
+    item_description: itemDescriptionState,
+    po_number: poNumberState,
+    so_date: soDateState,
+    so_number: soNumberState,
+    so_amount: soAmountState,
+    quotation_number: quotationNumberState,
+    quotation_amount: quotationAmountState,
+    qty_sold: qtySoldState,
+    payment_terms: paymentTermsState,
+    po_source: poSourceState,
+    payment_date: paymentDateState,
+    delivery_date: deliveryDateState,
+    date_created: dateCreatedState,
+    date_updated: new Date().toISOString(),
+  };
 
-    try {
-      const res = await fetch("/api/act-save-activity", {
-        method: "PUT",
+  try {
+    const res = await fetch("/api/act-save-activity", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newActivity),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      toast.error(result.error || "Failed to save activity.");
+      setLoading(false);
+      return;
+    }
+
+    if (statusState === "Endorsed") {
+      const endorsedData = {
+        company_name,
+        contact_person,
+        contact_number,
+        email_address,
+        address,
+        ticket_reference_number: ticketReferenceNumber,
+        wrap_up: wrapUpState,
+        inquiry: inquiryState,
+        manager: managerState,
+        agent: agentState,
+      };
+
+      const endorsedRes = await fetch("/api/act-endorsed-ticket", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newActivity),
+        body: JSON.stringify(endorsedData),
       });
 
-      const result = await res.json();
-
-      if (!res.ok) {
-        toast.error(result.error || "Failed to save activity.");
+      if (!endorsedRes.ok) {
+        const err = await endorsedRes.json();
+        toast.error(err.error || "Failed to save endorsed ticket.");
         setLoading(false);
         return;
       }
-
-      toast.success("Activity saved successfully!");
-      onCreated(newActivity);
-      setStep(1);
-      setSheetOpen(false);
-    } catch {
-      toast.error("Server error. Please try again.");
-    } finally {
-      setLoading(false);
     }
-  };
+
+    toast.success("Activity saved successfully!");
+    onCreated(newActivity);
+    setStep(1);
+    setSheetOpen(false);
+  } catch {
+    toast.error("Server error. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const onSheetOpenChange = (open: boolean) => {
     if (!open) {
@@ -402,11 +451,11 @@ export function UpdateTicketDialog({
                     }}
                     aria-current={isActive ? "step" : undefined}
                     aria-label={`Step ${s}: ${s === 1 ? "Traffic" :
-                        s === 2 ? "Department" :
-                          s === 3 ? "Ticket" :
-                            s === 4 ? "Customer" :
-                              s === 5 ? "Status" :
-                                "Assignee"
+                      s === 2 ? "Department" :
+                        s === 3 ? "Ticket" :
+                          s === 4 ? "Customer" :
+                            s === 5 ? "Status" :
+                              "Assignee"
                       }`}
                   >
                     <div

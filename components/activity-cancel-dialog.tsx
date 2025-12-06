@@ -12,7 +12,7 @@ export function CancelDialog({ onConfirm, onCancel }: CancelDialogProps) {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-md p-6 max-w-sm w-full shadow-lg">
-        <h3 className="text-lg font-semibold mb-4">
+        <h3 className="text-lg font-semibold mb-4 text-black">
           Are you sure you want to cancel this activity?
         </h3>
         <div className="flex justify-end gap-3">
