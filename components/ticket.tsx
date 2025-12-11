@@ -753,7 +753,7 @@ const filteredCompanies = companies
                         {displayedCompanies.map((c) => (
                         <AccordionItem
                             key={c.account_reference_number}
-                            value={c.account_reference_number}
+                            value={c.account_reference_number} //may kaparehas kasi bro
                         >
                             <div className="flex items-center justify-between text-xs font-semibold gap-2 px-4 py-2">
                             <AccordionTrigger className="text-xs font-semibold flex-1 text-left">

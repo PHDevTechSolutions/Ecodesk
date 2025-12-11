@@ -57,7 +57,7 @@ const data = {
   ],
   favorites: [
     { name: "Inquiries", url: "/inquiries", icon: BarChart2 },
-    { name: "Customer Database", url: "/accounts", icon: Phone },
+    { name: "Customer Database", url: "/customer-database", icon: Phone },
   ],
   workspaces: [
     {

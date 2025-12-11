@@ -7,6 +7,7 @@ if (!Xchire_databaseUrl) {
 }
 const Xchire_sql = neon(Xchire_databaseUrl);
 
+// Normalize array or string fields
 function normalizeField(value: any): string {
   if (Array.isArray(value)) {
     const filtered = value.filter((v) => v && v.trim() !== "");
@@ -18,18 +19,15 @@ function normalizeField(value: any): string {
   return "";
 }
 
-function getPrefix(companyName: string, region: string) {
-  // First two letters of company name, uppercase
-  const companyPart = companyName.trim().substring(0, 2).toUpperCase();
-
-  // Region uppercase, remove spaces
-  const regionPart = region.trim().toUpperCase().replace(/\s+/g, "");
-
+// Generate prefix from company name + region
+function getPrefix(companyName: string | null, region: string | null) {
+  const companyPart = (companyName ?? "").trim().substring(0, 2).toUpperCase();
+  const regionPart = (region ?? "").trim().toUpperCase().replace(/\s+/g, "");
   return `${companyPart}-${regionPart}`;
 }
 
+// Get next sequence number for the prefix
 async function getNextSequenceNumber(prefix: string) {
-  // Search last highest account_reference_number that starts with prefix + '-'
   const lastEntry = await Xchire_sql`
     SELECT account_reference_number
     FROM accounts
@@ -38,12 +36,11 @@ async function getNextSequenceNumber(prefix: string) {
     LIMIT 1;
   `;
 
-  if (lastEntry.length === 0) {
-    return 1; // start from 1 if none found
-  }
+  if (lastEntry.length === 0) return 1;
 
-  // Extract number part after prefix + '-'
-  const lastNumberStr = lastEntry[0].account_reference_number.substring(prefix.length + 1);
+  const lastNumberStr = lastEntry[0].account_reference_number
+    .substring(prefix.length + 1)
+    .split("-")[0]; // remove any timestamp suffix
 
   const lastNumber = parseInt(lastNumberStr, 10);
   if (isNaN(lastNumber)) return 1;
@@ -73,20 +70,15 @@ export async function POST(req: Request) {
       company_group
     } = body;
 
-    // if (!referenceid || !company_name || !type_client || !region) {
-    //   return NextResponse.json(
-    //     { success: false, error: "Missing required fields: referenceid, company_name, type_client or region." },
-    //     { status: 400 }
-    //   );
-    // }
-
-    // Generate account_reference_number
+    // Generate account_reference_number with guaranteed uniqueness
     const prefix = getPrefix(company_name, region);
     const nextSeq = await getNextSequenceNumber(prefix);
     const seqStr = nextSeq.toString().padStart(10, "0");
-    const account_reference_number = `${prefix}-${seqStr}`;
+    const timestamp = Date.now(); // high-res timestamp
+    const randomSuffix = Math.floor(Math.random() * 1000); // optional extra uniqueness
+    const account_reference_number = `${prefix}-${seqStr}-${timestamp}-${randomSuffix}`;
 
-    // Normalize array or string fields
+    // Normalize fields
     const normalizedContactPerson = normalizeField(contact_person);
     const normalizedContactNumber = normalizeField(contact_number);
     const normalizedEmailAddress = normalizeField(email_address);
@@ -97,6 +89,7 @@ export async function POST(req: Request) {
         ? date_created
         : new Date().toISOString();
 
+    // Insert into database
     const inserted = await Xchire_sql`
       INSERT INTO accounts
       (

@@ -24,7 +24,6 @@ import "react-phone-input-2/lib/style.css";
 export function AddCompanyModal() {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
-    manager: "",
     tsm: "",
     company_name: "",
     contact_person: "",
@@ -32,20 +31,22 @@ export function AddCompanyModal() {
     email_address: "",
     address: "",
     delivery_address: "",
-    region: "",
     industry: "",
-    remarks: "",
-    status: "Active",
     gender: "",
+    remarks: "",
     type_client: "CSR Client",
-    company_group: "",
+    manager: null,
+    region: null,
+    company_group: null,
+    status: "Active",
   });
 
-  // Store full company info for duplicate check
-  const [existingCompanies, setExistingCompanies] = useState<{ company_name: string, contact_person: string }[]>([]);
-  const [duplicate, setDuplicate] = useState(false);
+  const [existingCompanies, setExistingCompanies] = useState<
+    { company_name: string; contact_person: string }[]
+  >([]);
+  const [duplicate, setDuplicate] = useState({ contact: false });
 
-  const industries = [
+  const clientSegments = [
     "Agriculture, Hunting and Forestry",
     "Fishing",
     "Mining",
@@ -64,29 +65,9 @@ export function AddCompanyModal() {
     "Data Center",
   ];
 
-  const industryIcons: Record<string, string> = {
-    "Agriculture, Hunting and Forestry": "🌾",
-    Fishing: "🎣",
-    Mining: "⛏️",
-    Manufacturing: "🏭",
-    "Electricity, Gas and Water": "⚡",
-    Construction: "🏗️",
-    "Wholesale and Retail": "🛒",
-    "Hotels and Restaurants": "🏨",
-    "Transport, Storage and Communication": "🚚",
-    "Finance and Insurance": "💰",
-    "Real Estate and Renting": "🏠",
-    Education: "🎓",
-    "Health and Social Work": "🏥",
-    "Personal Services": "💇",
-    "Government Offices": "🏛️",
-    "Data Center": "🖥️",
-  };
-
   const genders = ["Male", "Female"];
-  const statuses = ["Active", "Inactive", "Pending"];
 
-  // Fetch existing CSR companies on modal open
+  // Fetch existing companies
   useEffect(() => {
     if (open) {
       fetch("/api/com-fetch-account")
@@ -103,25 +84,19 @@ export function AddCompanyModal() {
     }
   }, [open]);
 
-  // Check for duplicates based on company_name + contact_person
+  // Duplicate check for company_name + contact_person
   useEffect(() => {
     const name = formData.company_name.toLowerCase().trim();
     const person = formData.contact_person.toLowerCase().trim();
-
-    if (!name || !person) {
-      setDuplicate(false);
-      return;
-    }
 
     const isDuplicate = existingCompanies.some(
       (c) => c.company_name === name && c.contact_person === person
     );
 
-    setDuplicate(isDuplicate);
+    setDuplicate({ contact: isDuplicate });
   }, [formData.company_name, formData.contact_person, existingCompanies]);
 
-  const handleSave = async () => {
-    // Required fields
+  const isFormValid = () => {
     const requiredFields: Array<keyof typeof formData> = [
       "company_name",
       "contact_person",
@@ -130,25 +105,18 @@ export function AddCompanyModal() {
       "industry",
       "gender",
       "address",
+      "tsm",
     ];
+    const allFilled = requiredFields.every((field) => formData[field]);
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+      formData.email_address
+    );
+    const noDuplicate = !duplicate.contact;
+    return allFilled && emailValid && noDuplicate;
+  };
 
-    for (const key of requiredFields) {
-      if (!formData[key]) {
-        alert(`Please fill in the required field: ${key.replace("_", " ")}`);
-        return;
-      }
-    }
-
-    // Email validation
-    if (!formData.email_address.includes("@")) {
-      alert("Please enter a valid email address containing '@'");
-      return;
-    }
-
-    if (duplicate) {
-      alert("Company with this contact person already exists! Cannot save duplicate.");
-      return;
-    }
+  const handleSave = async () => {
+    if (!isFormValid()) return;
 
     try {
       const referenceId = crypto.randomUUID();
@@ -174,9 +142,7 @@ export function AddCompanyModal() {
 
       alert("Company saved successfully!");
       setOpen(false);
-      // Optionally, reset form
       setFormData({
-        manager: "",
         tsm: "",
         company_name: "",
         contact_person: "",
@@ -184,13 +150,14 @@ export function AddCompanyModal() {
         email_address: "",
         address: "",
         delivery_address: "",
-        region: "",
         industry: "",
-        remarks: "",
-        status: "Active",
         gender: "",
+        remarks: "",
         type_client: "CSR Client",
-        company_group: "",
+        manager: null,
+        region: null,
+        company_group: null,
+        status: "Active",
       });
     } catch (err) {
       console.error("Request failed:", err);
@@ -205,10 +172,11 @@ export function AddCompanyModal() {
           + Add Company
         </Button>
       </DialogTrigger>
-
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">Add New Company</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">
+            Add New Company
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4">
@@ -221,7 +189,7 @@ export function AddCompanyModal() {
               onChange={(e) =>
                 setFormData({ ...formData, company_name: e.target.value })
               }
-              className={duplicate ? "border-red-500" : ""}
+              className={duplicate.contact ? "border-red-500" : ""}
             />
           </div>
 
@@ -234,23 +202,23 @@ export function AddCompanyModal() {
               onChange={(e) =>
                 setFormData({ ...formData, contact_person: e.target.value })
               }
-              className={duplicate ? "border-red-500" : ""}
+              className={duplicate.contact ? "border-red-500" : ""}
             />
-            {duplicate && (
+            {duplicate.contact && (
               <p className="text-red-600 text-sm mt-1">
                 This company with the same contact person already exists!
               </p>
             )}
           </div>
 
-          {/* Manager */}
+          {/* TSM */}
           <div>
-            <Label>Manager</Label>
+            <Label>Technical Sales Manager *</Label>
             <Input
-              placeholder="Enter manager name"
-              value={formData.manager}
+              placeholder="Enter Technical Sales Manager"
+              value={formData.tsm}
               onChange={(e) =>
-                setFormData({ ...formData, manager: e.target.value })
+                setFormData({ ...formData, tsm: e.target.value })
               }
             />
           </div>
@@ -260,14 +228,18 @@ export function AddCompanyModal() {
             <Label>Gender *</Label>
             <Select
               value={formData.gender}
-              onValueChange={(value) => setFormData({ ...formData, gender: value })}
+              onValueChange={(value) =>
+                setFormData({ ...formData, gender: value })
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>
               <SelectContent>
                 {genders.map((g) => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -277,7 +249,7 @@ export function AddCompanyModal() {
           <div>
             <Label>Contact Number *</Label>
             <PhoneInput
-              country={"ph"}
+              country="ph"
               value={formData.contact_number}
               onChange={(value) =>
                 setFormData({ ...formData, contact_number: value })
@@ -291,8 +263,8 @@ export function AddCompanyModal() {
           <div>
             <Label>Email Address *</Label>
             <Input
-              placeholder="Enter email address"
               type="email"
+              placeholder="Enter email address"
               value={formData.email_address}
               onChange={(e) =>
                 setFormData({ ...formData, email_address: e.target.value })
@@ -301,7 +273,7 @@ export function AddCompanyModal() {
           </div>
 
           {/* Address */}
-          <div>
+          <div className="col-span-2">
             <Label>Address *</Label>
             <Input
               placeholder="Enter address"
@@ -313,8 +285,8 @@ export function AddCompanyModal() {
           </div>
 
           {/* Delivery Address */}
-          <div>
-            <Label>Delivery Address</Label>
+          <div className="col-span-2">
+            <Label>Delivery Address * </Label>
             <Input
               placeholder="Enter delivery address"
               value={formData.delivery_address}
@@ -324,27 +296,22 @@ export function AddCompanyModal() {
             />
           </div>
 
-          {/* Type Client */}
-          <div>
-            <Label>Client Segment</Label>
-            <Input value="CSR Client" readOnly className="bg-gray-200" />
-          </div>
-
-          {/* Industry */}
+          {/* Client Segment */}
           <div className="col-span-2">
-            <Label>Industry *</Label>
+            <Label>Client Segment *</Label>
             <Select
               value={formData.industry}
-              onValueChange={(value) => setFormData({ ...formData, industry: value })}
+              onValueChange={(value) =>
+                setFormData({ ...formData, industry: value })
+              }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select industry" />
+                <SelectValue placeholder="Select client segment" />
               </SelectTrigger>
               <SelectContent className="max-h-64 overflow-auto">
-                {industries.map((ind) => (
-                  <SelectItem key={ind} value={ind} className="flex items-center gap-2">
-                    <span>{industryIcons[ind]}</span>
-                    <span>{ind}</span>
+                {clientSegments.map((ind) => (
+                  <SelectItem key={ind} value={ind}>
+                    {ind}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -357,64 +324,12 @@ export function AddCompanyModal() {
             <textarea
               placeholder="Enter remarks"
               value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, remarks: e.target.value })
+              }
               className="w-full border rounded-md p-2"
               rows={4}
             />
-          </div>
-
-          {/* Region */}
-          <div>
-            <Label>Region</Label>
-            <Input
-              placeholder="Enter region"
-              value={formData.region}
-              onChange={(e) =>
-                setFormData({ ...formData, region: e.target.value })
-              }
-            />
-          </div>
-
-          {/* Company Group */}
-          <div>
-            <Label>Company Group</Label>
-            <Input
-              placeholder="Enter company group"
-              value={formData.company_group}
-              onChange={(e) =>
-                setFormData({ ...formData, company_group: e.target.value })
-              }
-            />
-          </div>
-
-          {/* TSM */}
-          <div>
-            <Label>Technical Sales Manager</Label>
-            <Input
-              placeholder="Enter Technical Sales Manager"
-              value={formData.tsm}
-              onChange={(e) =>
-                setFormData({ ...formData, tsm: e.target.value })
-              }
-            />
-          </div>
-
-          {/* Status */}
-          <div>
-            <Label>Status</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) => setFormData({ ...formData, status: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statuses.map((status) => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Save Button */}
@@ -423,7 +338,7 @@ export function AddCompanyModal() {
               className="w-full mt-4"
               onClick={handleSave}
               variant="default"
-              disabled={duplicate}
+              disabled={!isFormValid()}
             >
               Save Company
             </Button>
