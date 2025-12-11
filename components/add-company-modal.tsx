@@ -128,7 +128,6 @@ export function AddCompanyModal() {
       "contact_number",
       "email_address",
       "industry",
-      "manager",
       "gender",
       "address",
     ];
@@ -246,7 +245,7 @@ export function AddCompanyModal() {
 
           {/* Manager */}
           <div>
-            <Label>Manager *</Label>
+            <Label>Manager</Label>
             <Input
               placeholder="Enter manager name"
               value={formData.manager}
