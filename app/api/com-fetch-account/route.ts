@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   try {
     // Fetch all CSR Client accounts, including the id, sorted alphabetically by company_name
     const Xchire_fetch = await Xchire_sql`
-      SELECT id, account_reference_number, referenceid, company_name, contact_person, contact_number, address, region, industry, type_client
+      SELECT id, account_reference_number, referenceid, company_name, contact_person, contact_number, email_address, address, region, industry, type_client
       FROM accounts
       ORDER BY company_name ASC;
     `;

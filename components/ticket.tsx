@@ -179,32 +179,34 @@ export const Ticket: React.FC<TicketProps> = ({
     };
 
     // Fetch companies on mount
-    useEffect(() => {
+    const fetchCompanies = async () => {
         setLoadingCompanies(true);
         setErrorCompanies(null);
 
-        fetch(`/api/com-fetch-account`, {
-            cache: "no-store",
-            headers: {
-                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-                Pragma: "no-cache",
-                Expires: "0",
-            },
-        })
-            .then((res) => {
-                if (!res.ok) throw new Error("Failed to fetch company data");
-                return res.json();
-            })
-            .then((data) => {
-                setCompanies(data.data || []);
-            })
-            .catch((err) => {
-                setErrorCompanies(err.message || "Error fetching company data");
-            })
-            .finally(() => {
-                setLoadingCompanies(false);
+        try {
+            const res = await fetch("/api/com-fetch-account", {
+                cache: "no-store",
+                headers: {
+                    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+                    Pragma: "no-cache",
+                    Expires: "0",
+                },
             });
+            if (!res.ok) throw new Error("Failed to fetch company data");
+            const data = await res.json();
+            setCompanies(data.data || []);
+        } catch (err: any) {
+            setErrorCompanies(err.message || "Error fetching company data");
+        } finally {
+            setLoadingCompanies(false);
+        }
+    };
+
+
+    useEffect(() => {
+        fetchCompanies();
     }, []);
+
 
     // Fetch activities when referenceid changes
     const fetchActivities = useCallback(async () => {
@@ -708,7 +710,6 @@ export const Ticket: React.FC<TicketProps> = ({
                 formatDate(item.delivery_date),
             ]);
 
-
             const csvContent =
                 [
                     headers.join(","),
@@ -746,7 +747,11 @@ export const Ticket: React.FC<TicketProps> = ({
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-semibold">Companies</CardTitle>
                         {/* LEFT SIDE — COMPANIES */}
-                        <AddCompanyModal referenceid={referenceid} />
+                        <AddCompanyModal
+                            referenceid={referenceid}
+                            onCreated={fetchCompanies} // pass the fetch function here
+                        />
+
                     </div>
                 </CardHeader>
 
@@ -804,7 +809,7 @@ export const Ticket: React.FC<TicketProps> = ({
                                         <p>
                                             <strong>Email Address:</strong> {c.email_address || "-"}
                                         </p>
-                                        <p>
+                                        <p className="capitalize">
                                             <strong>Contact Person:</strong> {c.contact_person || "-"}
                                         </p>
                                         <p>
