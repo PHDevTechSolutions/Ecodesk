@@ -3,9 +3,25 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CancelDialog } from "@/components/activity-cancel-dialog";
 import { toast } from "sonner";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
 
 interface EditModalProps {
   isOpen: boolean;
@@ -25,9 +41,7 @@ export const CustomerDatabaseEditModal: React.FC<EditModalProps> = ({
   const [contactNumber, setContactNumber] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [address, setAddress] = useState("");
-  const [region, setRegion] = useState("");
   const [industry, setIndustry] = useState("");
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,7 +51,6 @@ export const CustomerDatabaseEditModal: React.FC<EditModalProps> = ({
       setContactNumber(account.contact_number ?? "");
       setEmailAddress(account.email_address ?? "");
       setAddress(account.address ?? "");
-      setRegion(account.region ?? "");
       setIndustry(account.industry ?? "");
     }
   }, [account, isOpen]);
@@ -53,14 +66,13 @@ export const CustomerDatabaseEditModal: React.FC<EditModalProps> = ({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: account.id, // make sure id is included
+          id: account.id,
           referenceid: account.referenceid,
           company_name: companyName,
           contact_person: contactPerson,
           contact_number: contactNumber,
           email_address: emailAddress,
           address: address,
-          region: region,
           industry: industry,
           type_client: account.type_client,
           status: account.status,
@@ -83,122 +95,126 @@ export const CustomerDatabaseEditModal: React.FC<EditModalProps> = ({
     }
   };
 
-  const handleCloseAttempt = () => setShowCancelDialog(true);
-  const handleCancelConfirm = () => {
-    setShowCancelDialog(false);
-    onClose();
-  };
-  const handleCancelReject = () => setShowCancelDialog(false);
-  const isDisabled = showCancelDialog;
-
   if (!isOpen || !account) return null;
 
   return (
-    <>
-      {/* Modal */}
-      <div
-        className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50"
-        onClick={handleCloseAttempt}
+    <Dialog open={isOpen} onOpenChange={(open) => !loading && !open && onClose()}>
+      <DialogContent
+        style={{ maxWidth: "60vw", width: "50vw" }}
+        className="mx-auto rounded-lg p-6"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="bg-white rounded-md p-6 max-w-md w-full shadow-lg"
-          onClick={(e) => e.stopPropagation()}
+        <DialogHeader>
+          <DialogTitle>Edit Account</DialogTitle>
+          <DialogDescription>
+            Update the information below and click save.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          className="flex flex-col gap-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSave();
+          }}
         >
-          <h2 className="text-lg font-semibold mb-4">Edit Account</h2>
+          <FieldSet disabled={loading}>
+            <FieldGroup className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <Field>
+                <FieldLabel htmlFor="companyName">Company Name</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="companyName"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                  />
+                </FieldContent>
+                <FieldDescription>
+                  Enter the company or business name.
+                </FieldDescription>
+              </Field>
 
-          <div className="flex flex-col gap-4">
-            {/* Reference ID (disabled) */}
-            <div>
-              <Label>Reference ID</Label>
-              <Input value={account.referenceid} disabled />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="contactPerson">Contact Person</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="contactPerson"
+                    value={contactPerson}
+                    onChange={(e) => setContactPerson(e.target.value)}
+                  />
+                </FieldContent>
+                <FieldDescription>
+                  Name of the main contact person.
+                </FieldDescription>
+              </Field>
 
-            <div>
-              <Label>Company Name</Label>
-              <Input
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="contactNumber">Contact Number</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="contactNumber"
+                    value={contactNumber}
+                    onChange={(e) => setContactNumber(e.target.value)}
+                  />
+                </FieldContent>
+                <FieldDescription>Phone or mobile number.</FieldDescription>
+              </Field>
 
-            <div>
-              <Label>Contact Person</Label>
-              <Input
-                value={contactPerson}
-                onChange={(e) => setContactPerson(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="emailAddress">Email Address</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="emailAddress"
+                    type="email"
+                    value={emailAddress}
+                    onChange={(e) => setEmailAddress(e.target.value)}
+                  />
+                </FieldContent>
+                <FieldDescription>Contact email address.</FieldDescription>
+              </Field>
 
-            <div>
-              <Label>Contact Number</Label>
-              <Input
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="address">Address</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                </FieldContent>
+                <FieldDescription>Physical address or location.</FieldDescription>
+              </Field>
 
-            <div>
-              <Label>Email Address</Label>
-              <Input
-                value={emailAddress}
-                onChange={(e) => setEmailAddress(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
+              <Field>
+                <FieldLabel htmlFor="industry">Industry</FieldLabel>
+                <FieldContent>
+                  <Input
+                    id="industry"
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                  />
+                </FieldContent>
+                <FieldDescription>Industry classification.</FieldDescription>
+              </Field>
+            </FieldGroup>
+          </FieldSet>
 
-            <div>
-              <Label>Address</Label>
-              <Input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
-
-            <div>
-              <Label>Region</Label>
-              <Input
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
-
-            <div>
-              <Label>Industry</Label>
-              <Input
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                disabled={isDisabled}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={handleCloseAttempt}
-                disabled={isDisabled}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={loading || isDisabled}>
-                {loading ? "Saving..." : "Save"}
-              </Button>
-            </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => !loading && onClose()}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save"}
+            </Button>
           </div>
-        </div>
-      </div>
-
-      {/* Cancel Dialog */}
-      {showCancelDialog && (
-        <CancelDialog
-          onConfirm={handleCancelConfirm}
-          onCancel={handleCancelReject}
-        />
-      )}
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CancelDialog } from "@/components/activity-cancel-dialog";
 import { toast } from "sonner";
 
 interface HideModalProps {
@@ -18,7 +17,8 @@ export const CustomerDatabaseHideModal: React.FC<HideModalProps> = ({
   account,
   onSave,
 }) => {
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  // Optional: for extra cancel confirmation dialog (not currently used)
+  // const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleConfirmHide = async () => {
@@ -53,29 +53,27 @@ export const CustomerDatabaseHideModal: React.FC<HideModalProps> = ({
     }
   };
 
-  const handleCloseAttempt = () => setShowCancelDialog(true);
-  const handleCancelConfirm = () => {
-    setShowCancelDialog(false);
+  // Close modal immediately on Cancel click
+  const handleCancelClick = () => {
     onClose();
   };
-  const handleCancelReject = () => setShowCancelDialog(false);
-  const isDisabled = showCancelDialog;
 
   if (!isOpen || !account) return null;
 
   return (
     <>
-      {/* Modal */}
+      {/* Modal backdrop */}
       <div
         className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50"
-        onClick={handleCloseAttempt}
+        onClick={handleCancelClick} // clicking outside modal closes it
       >
+        {/* Modal content */}
         <div
           className="bg-white rounded-md p-6 max-w-md w-full shadow-lg"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside
         >
           <h2 className="text-lg font-semibold mb-4">Deactivate Account</h2>
-          <p className="mb-4">
+          <p className="mb-4 text-sm">
             Are you sure you want to deactivate the account{" "}
             <strong>{account.company_name ?? "-"}</strong>?
           </p>
@@ -83,25 +81,17 @@ export const CustomerDatabaseHideModal: React.FC<HideModalProps> = ({
           <div className="flex justify-end gap-2 mt-4">
             <Button
               variant="outline"
-              onClick={handleCloseAttempt}
-              disabled={isDisabled}
+              onClick={handleCancelClick}
+              disabled={loading}
             >
               Cancel
             </Button>
-            <Button onClick={handleConfirmHide} disabled={loading || isDisabled}>
+            <Button onClick={handleConfirmHide} disabled={loading}>
               {loading ? "Processing..." : "Confirm"}
             </Button>
           </div>
         </div>
       </div>
-
-      {/* Cancel Dialog */}
-      {showCancelDialog && (
-        <CancelDialog
-          onConfirm={handleCancelConfirm}
-          onCancel={handleCancelReject}
-        />
-      )}
     </>
   );
 };
