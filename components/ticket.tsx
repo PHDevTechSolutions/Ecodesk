@@ -337,50 +337,71 @@ export const Ticket: React.FC<TicketProps> = ({
 
     const excludedCompanyStatuses = ["Pending", "Transferred", "Remove"];
 
-const normalize = (str: string) =>
-  str
-    .toLowerCase()
-    .replace(/[_\s]+/g, " ") // replace underscores and multiple spaces with single space
-    .trim();
+    const normalize = (str: string) =>
+    str
+        .toLowerCase()
+        .replace(/[_\s]+/g, " ") // replace underscores and multiple spaces with single space
+        .trim();
 
-const filteredCompanies = companies
-  .filter((c) => {
-    if (excludedCompanyStatuses.includes(c.status)) return false;
-    if (c.type_client !== "CSR Client") return false;
+    const filteredCompanies = companies
+    .filter((c) => {
+        if (excludedCompanyStatuses.includes(c.status)) return false;
+        if (c.type_client !== "CSR Client") return false;
 
-    const term = normalize(searchTerm);
+        const term = normalize(searchTerm);
+        if (!term) return true;
 
-    const name = normalize(c.company_name || "");
-    const email = normalize(c.email_address || "");
-    const contact = normalize(c.contact_number || "");
-    const person = normalize(c.contact_person || "");
+        const fields = [
+        normalize(c.company_name || ""),
+        normalize(c.email_address || ""),
+        normalize(c.contact_number || ""),
+        normalize(c.contact_person || ""),
+        ];
 
-    return name.includes(term) || email.includes(term) || contact.includes(term) || person.includes(term);
-  })
-  .sort((a, b) => {
-    const term = normalize(searchTerm);
-    const nameA = normalize(a.company_name || "");
-    const nameB = normalize(b.company_name || "");
+        return fields.some((field) => field.includes(term));
+    })
+    .sort((a, b) => {
+        const term = normalize(searchTerm);
+        if (!term) return 0;
 
-    const score = (name: string) => {
-      if (name === term) return 0; // exact match
-      if (name.startsWith(term)) return 1; // prefix match
-      return 2; // contains match
-    };
+        const score = (company: Company) => {
+        const fields = [
+            normalize(company.company_name || ""),
+            normalize(company.email_address || ""),
+            normalize(company.contact_number || ""),
+            normalize(company.contact_person || ""),
+        ];
 
-    return score(nameA) - score(nameB);
-  });
+        // Get the best match score among all fields
+        let bestScore = 3;
+        fields.forEach((field) => {
+            if (field === term) bestScore = Math.min(bestScore, 0);
+            else if (field.startsWith(term)) bestScore = Math.min(bestScore, 1);
+            else if (field.includes(term)) bestScore = Math.min(bestScore, 2);
+        });
+
+        return bestScore;
+        };
+
+        return score(a) - score(b);
+    });
 
 
-    const MAX_DISPLAY = 99999999999;
 
-    const displayedCompanies = searchTerm
-        ? filteredCompanies
-        : filteredCompanies.slice(0, MAX_DISPLAY);
+    const MAX_DISPLAY = 20;
 
+const displayedCompanies = useMemo(() => {
+    // 1️⃣ Exclude the company that is currently being added
+    const filtered = filteredCompanies.filter(
+        (c) => c.account_reference_number !== addingAccount
+    );
+
+    // 2️⃣ Slice to MAX_DISPLAY after relevance sorting
+    return filtered.slice(0, MAX_DISPLAY);
+}, [filteredCompanies, addingAccount]); // added addingAccount as dependency
     // Filter activities by search term (right side)
-    const filteredActivities = useMemo(() => {
-        if (!activitySearchTerm.trim()) return mergedData;
+        const filteredActivities = useMemo(() => {
+            if (!activitySearchTerm.trim()) return mergedData;
 
         const term = activitySearchTerm.toLowerCase();
         return mergedData.filter((item) => {
@@ -728,7 +749,7 @@ const filteredCompanies = companies
                     <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-semibold">Companies</CardTitle>
                     {/* LEFT SIDE — COMPANIES */}
-                    <AddCompanyModal /> 
+                    <AddCompanyModal referenceid={referenceid} />
                     </div>
                 </CardHeader>
 

@@ -1,13 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,9 +13,16 @@ import {
 } from "@/components/ui/select";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
+import { CancelDialog } from "./activity-cancel-dialog";
 
-export function AddCompanyModal() {
+interface AddCompanyModalProps {
+  referenceid: string;
+}
+export function AddCompanyModal({ referenceid }: AddCompanyModalProps) {
+
   const [open, setOpen] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
   const [formData, setFormData] = useState({
     tsm: "",
     company_name: "",
@@ -32,13 +32,14 @@ export function AddCompanyModal() {
     address: "",
     delivery_address: "",
     industry: "",
-    gender: "",
+    gender: "Male",
     remarks: "",
     type_client: "CSR Client",
     manager: null,
     region: null,
     company_group: null,
     status: "Active",
+    traffic: "",
   });
 
   const [existingCompanies, setExistingCompanies] = useState<
@@ -48,26 +49,25 @@ export function AddCompanyModal() {
 
   const clientSegments = [
     "Agriculture, Hunting and Forestry",
-    "Fishing",
-    "Mining",
-    "Manufacturing",
-    "Electricity, Gas and Water",
     "Construction",
-    "Wholesale and Retail",
-    "Hotels and Restaurants",
-    "Transport, Storage and Communication",
-    "Finance and Insurance",
-    "Real Estate and Renting",
-    "Education",
-    "Health and Social Work",
-    "Personal Services",
-    "Government Offices",
     "Data Center",
+    "Education",
+    "Electricity, Gas and Water",
+    "Fishing",
+    "Finance and Insurance",
+    "Government Offices",
+    "Health and Social Work",
+    "Hotels and Restaurants",
+    "Manufacturing",
+    "Mining",
+    "Personal Services",
+    "Real Estate and Renting",
+    "Transport, Storage and Communication",
+    "Wholesale and Retail",
   ];
 
   const genders = ["Male", "Female"];
 
-  // Fetch existing companies
   useEffect(() => {
     if (open) {
       fetch("/api/com-fetch-account")
@@ -84,15 +84,12 @@ export function AddCompanyModal() {
     }
   }, [open]);
 
-  // Duplicate check for company_name + contact_person
   useEffect(() => {
     const name = formData.company_name.toLowerCase().trim();
     const person = formData.contact_person.toLowerCase().trim();
-
     const isDuplicate = existingCompanies.some(
       (c) => c.company_name === name && c.contact_person === person
     );
-
     setDuplicate({ contact: isDuplicate });
   }, [formData.company_name, formData.contact_person, existingCompanies]);
 
@@ -116,235 +113,332 @@ export function AddCompanyModal() {
   };
 
   const handleSave = async () => {
-    if (!isFormValid()) return;
+  if (!isFormValid()) {
+    alert("Please fill all required fields correctly and avoid duplicates.");
+    return;
+  }
 
-    try {
-      const referenceId = crypto.randomUUID();
+  try {
+    const gender = genders.includes(formData.gender) ? formData.gender : "Male";
 
-      const payload = {
-        referenceid: referenceId,
-        ...formData,
-        date_created: new Date().toISOString(),
-      };
+    // Generate account_reference_number using companyName + region
+    const getPrefix = (company_name: string | null, region: string | null) => {
+      const companyPart = (company_name ?? "").trim().substring(0, 2).toUpperCase();
+      const regionPart = (region ?? "").trim().toUpperCase().replace(/\s+/g, "");
+      return `${companyPart}-${regionPart}`;
+    };
 
-      const response = await fetch("/api/com-save-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    const accountReferenceNumber = getPrefix(formData.company_name, formData.region);
 
-      const result = await response.json();
+    // 1️⃣ Payload for company API
+    const companyPayload = {
+      referenceid,
+      account_reference_number: accountReferenceNumber,
+      ...formData,
+      gender,
+      remarks: formData.remarks.trim() === "" ? null : formData.remarks,
+      date_created: new Date().toISOString(),
+    };
 
-      if (!response.ok) {
-        alert("Error: " + result.error);
-        return;
-      }
+    const companyRes = await fetch("/api/com-save-company", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(companyPayload),
+    });
 
-      alert("Company saved successfully!");
-      setOpen(false);
-      setFormData({
-        tsm: "",
-        company_name: "",
-        contact_person: "",
-        contact_number: "",
-        email_address: "",
-        address: "",
-        delivery_address: "",
-        industry: "",
-        gender: "",
-        remarks: "",
-        type_client: "CSR Client",
-        manager: null,
-        region: null,
-        company_group: null,
-        status: "Active",
-      });
-    } catch (err) {
-      console.error("Request failed:", err);
-      alert("Request failed: " + err);
+    const companyResult = await companyRes.json();
+    if (!companyRes.ok) {
+      alert("Company save failed: " + (companyResult.error || "Unknown error"));
+      return;
     }
+
+    // 2️⃣ Payload for activity/ticket API
+    const ticketPayload = {
+      referenceid, // same as props
+      account_reference_number: accountReferenceNumber,
+      traffic: formData.traffic || null,
+      status: "On-Progress",
+      date_created: new Date().toISOString(),
+    };
+
+    const ticketRes = await fetch("/api/act-save-ticket", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ticketPayload),
+    });
+
+    const ticketResult = await ticketRes.json();
+    if (!ticketRes.ok) {
+      alert("Activity save failed: " + (ticketResult.error || "Unknown error"));
+      return;
+    }
+
+    // Success
+    alert("Company and activity saved successfully!");
+    setOpen(false);
+    resetForm(); // make sure you have a resetForm function to clear formData
+  } catch (err) {
+    console.error("Request failed:", err);
+    alert("Request failed: " + err);
+  }
+};
+
+
+  const resetForm = () => {
+    setFormData({
+      tsm: "",
+      company_name: "",
+      contact_person: "",
+      contact_number: "",
+      email_address: "",
+      address: "",
+      delivery_address: "",
+      industry: "",
+      gender: "Male",
+      remarks: "",
+      type_client: "CSR Client",
+      manager: null,
+      region: null,
+      company_group: null,
+      status: "Active",
+      traffic: ""
+    });
   };
 
+  const handleCloseAttempt = () => setShowCancelDialog(true);
+  const handleCancelConfirm = () => {
+    setShowCancelDialog(false);
+    setOpen(false);
+    resetForm();
+  };
+  const handleCancelReject = () => setShowCancelDialog(false);
+  const isDisabled = showCancelDialog;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="default">
-          + Add Company
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">
-            Add New Company
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      {/* Trigger Button */}
+      <Button size="sm" variant="default" onClick={() => setOpen(true)}>
+        + Add Company
+      </Button>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* Company Name */}
-          <div className="col-span-2">
-            <Label>Company Name *</Label>
-            <Input
-              placeholder="Enter company name"
-              value={formData.company_name}
-              onChange={(e) =>
-                setFormData({ ...formData, company_name: e.target.value })
-              }
-              className={duplicate.contact ? "border-red-500" : ""}
-            />
-          </div>
+      {/* Modal */}
+      {open && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50"
+          onClick={handleCloseAttempt} // click outside triggers cancel dialog
+        >
+          <div
+            className="bg-white rounded-md p-6 max-w-lg w-full shadow-lg max-h-[90vh] overflow-visible"
+            onClick={(e) => e.stopPropagation()} // prevent modal clicks from closing
+          >
+            <h2 className="text-lg font-semibold mb-4">Add New Company</h2>
 
-          {/* Contact Person */}
-          <div>
-            <Label>Customer Name *</Label>
-            <Input
-              placeholder="Enter customer name"
-              value={formData.contact_person}
-              onChange={(e) =>
-                setFormData({ ...formData, contact_person: e.target.value })
-              }
-              className={duplicate.contact ? "border-red-500" : ""}
-            />
-            {duplicate.contact && (
-              <p className="text-red-600 text-sm mt-1">
-                This company with the same contact person already exists!
-              </p>
-            )}
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Company Name */}
+              <div className="col-span-2">
+                <Label>Company Name *</Label>
+                <Input
+                  placeholder="Enter company name"
+                  value={formData.company_name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, company_name: e.target.value })
+                  }
+                  className={duplicate.contact ? "border-red-500" : ""}
+                  disabled={isDisabled}
+                />
+                {duplicate.contact && (
+                  <p className="text-red-600 text-sm mt-1">
+                    This company with the same contact person already exists!
+                  </p>
+                )}
+              </div>
 
-          {/* TSM */}
-          <div>
-            <Label>Technical Sales Manager *</Label>
-            <Input
-              placeholder="Enter Technical Sales Manager"
-              value={formData.tsm}
-              onChange={(e) =>
-                setFormData({ ...formData, tsm: e.target.value })
-              }
-            />
-          </div>
+              {/* Customer Name */}
+              <div>
+                <Label>Customer Name *</Label>
+                <Input
+                  placeholder="Enter customer name"
+                  value={formData.contact_person}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contact_person: e.target.value })
+                  }
+                  className={duplicate.contact ? "border-red-500" : ""}
+                  disabled={isDisabled}
+                />
+              </div>
 
-          {/* Gender */}
-          <div>
-            <Label>Gender *</Label>
-            <Select
-              value={formData.gender}
-              onValueChange={(value) =>
-                setFormData({ ...formData, gender: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select gender" />
-              </SelectTrigger>
-              <SelectContent>
-                {genders.map((g) => (
-                  <SelectItem key={g} value={g}>
-                    {g}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {/* TSM */}
+              <div>
+                <Label>Technical Sales Manager *</Label>
+                <Input
+                  placeholder="Enter Technical Sales Manager"
+                  value={formData.tsm}
+                  onChange={(e) =>
+                    setFormData({ ...formData, tsm: e.target.value })
+                  }
+                  disabled={isDisabled}
+                />
+              </div>
 
-          {/* Contact Number */}
-          <div>
-            <Label>Contact Number *</Label>
-            <PhoneInput
-              country="ph"
-              value={formData.contact_number}
-              onChange={(value) =>
-                setFormData({ ...formData, contact_number: value })
-              }
-              inputStyle={{ width: "100%", height: "40px" }}
-              dropdownStyle={{ zIndex: 99999 }}
-            />
-          </div>
+              {/* Gender */}
+              <div>
+                <Label>Gender *</Label>
+                <Select
+                  value={formData.gender}
+                  onValueChange={(value: string) =>
+                    setFormData({ ...formData, gender: value })
+                  }
+                  disabled={isDisabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10000]">
+                    {genders.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {g}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Email */}
-          <div>
-            <Label>Email Address *</Label>
-            <Input
-              type="email"
-              placeholder="Enter email address"
-              value={formData.email_address}
-              onChange={(e) =>
-                setFormData({ ...formData, email_address: e.target.value })
-              }
-            />
-          </div>
+              {/* Contact Number */}
+              <div>
+                <Label>Contact Number *</Label>
+                <PhoneInput
+                  country="ph"
+                  value={formData.contact_number}
+                  onChange={(value) =>
+                    setFormData({ ...formData, contact_number: value })
+                  }
+                  inputStyle={{ width: "100%", height: "40px" }}
+                  dropdownStyle={{ zIndex: 10000 }}
+                  disabled={isDisabled}
+                />
+              </div>
 
-          {/* Address */}
-          <div className="col-span-2">
-            <Label>Address *</Label>
-            <Input
-              placeholder="Enter address"
-              value={formData.address}
-              onChange={(e) =>
-                setFormData({ ...formData, address: e.target.value })
-              }
-            />
-          </div>
+              {/* Email */}
+              <div>
+                <Label>Email Address *</Label>
+                <Input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={formData.email_address}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email_address: e.target.value })
+                  }
+                  disabled={isDisabled}
+                />
+              </div>
 
-          {/* Delivery Address */}
-          <div className="col-span-2">
-            <Label>Delivery Address * </Label>
-            <Input
-              placeholder="Enter delivery address"
-              value={formData.delivery_address}
-              onChange={(e) =>
-                setFormData({ ...formData, delivery_address: e.target.value })
-              }
-            />
-          </div>
+              {/* Address */}
+              <div className="col-span-2">
+                <Label>Address *</Label>
+                <Input
+                  placeholder="Enter address"
+                  value={formData.address}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
+                  disabled={isDisabled}
+                />
+              </div>
 
-          {/* Client Segment */}
-          <div className="col-span-2">
-            <Label>Client Segment *</Label>
-            <Select
-              value={formData.industry}
-              onValueChange={(value) =>
-                setFormData({ ...formData, industry: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select client segment" />
-              </SelectTrigger>
-              <SelectContent className="max-h-64 overflow-auto">
-                {clientSegments.map((ind) => (
-                  <SelectItem key={ind} value={ind}>
-                    {ind}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {/* Delivery Address */}
+              <div className="col-span-2">
+                <Label>Delivery Address *</Label>
+                <Input
+                  placeholder="Enter delivery address"
+                  value={formData.delivery_address}
+                  onChange={(e) =>
+                    setFormData({ ...formData, delivery_address: e.target.value })
+                  }
+                  disabled={isDisabled}
+                />
+              </div>
 
-          {/* Remarks */}
-          <div className="col-span-2">
-            <Label>Remarks</Label>
-            <textarea
-              placeholder="Enter remarks"
-              value={formData.remarks}
-              onChange={(e) =>
-                setFormData({ ...formData, remarks: e.target.value })
-              }
-              className="w-full border rounded-md p-2"
-              rows={4}
-            />
-          </div>
+              {/* Client Segment */}
+              <div className="col-span-2">
+                <Label>Client Segment *</Label>
+                <Select
+                  value={formData.industry}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, industry: value })
+                  }
+                  disabled={isDisabled}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select client segment" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64 overflow-auto z-[10000]">
+                    {clientSegments.map((ind) => (
+                      <SelectItem key={ind} value={ind}>
+                        {ind}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Save Button */}
-          <div className="col-span-2">
-            <Button
-              className="w-full mt-4"
-              onClick={handleSave}
-              variant="default"
-              disabled={!isFormValid()}
-            >
-              Save Company
-            </Button>
+               {/* Delivery Address */}
+              <div className="col-span-2">
+                <Label>Traffic *</Label>
+                <Input
+                  placeholder="Enter delivery address"
+                  value={formData.traffic}
+                  onChange={(e) =>
+                    setFormData({ ...formData, traffic: e.target.value })
+                  }
+                  disabled={isDisabled}
+                />
+              </div>
+
+              {/* Remarks */}
+              <div className="col-span-2">
+                <Label>Remarks</Label>
+                <textarea
+                  placeholder="Enter remarks"
+                  value={formData.remarks}
+                  onChange={(e) =>
+                    setFormData({ ...formData, remarks: e.target.value })
+                  }
+                  className="w-full border rounded-md p-2"
+                  rows={4}
+                  disabled={isDisabled}
+                />
+              </div>
+
+              {/* Save + Cancel */}
+              <div className="col-span-2 flex gap-2 mt-4">
+                <Button
+                  className="flex-1"
+                  onClick={handleSave}
+                  variant="default"
+                  disabled={!isFormValid() || isDisabled}
+                >
+                  Save Company
+                </Button>
+                <Button
+                  className="flex-1"
+                  variant="outline"
+                  onClick={handleCloseAttempt}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      )}
+
+      {/* Cancel Dialog */}
+      {showCancelDialog && (
+        <CancelDialog
+          onConfirm={handleCancelConfirm}
+          onCancel={handleCancelReject}
+        />
+      )}
+    </>
   );
 }

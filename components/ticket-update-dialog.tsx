@@ -357,34 +357,47 @@ export function UpdateTicketDialog({
       }
 
       if (statusState === "Endorsed") {
-        const endorsedData = {
-          account_reference_number,
-          company_name,
-          contact_person,
-          contact_number,
-          email_address,
-          address,
-          ticket_reference_number: ticketReferenceNumber,
-          wrap_up: wrapUpState,
-          inquiry: inquiryState,
-          manager: managerState,
-          agent: agentState,
-          status: "Endorsed"
-        };
+  try {
+    setLoading(true);
 
-        const endorsedRes = await fetch("/api/act-endorsed-ticket", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(endorsedData),
-        });
+    const endorsedData = {
+      agent: referenceid,
+      account_reference_number,
+      company_name,
+      contact_person,
+      contact_number,
+      email_address,
+      address,
+      ticket_reference_number: ticketReferenceNumber,
+      wrap_up: wrapUpState,
+      inquiry: inquiryState,
+      tsm: managerState,
+      referenceid: agentState,
+      status: "Endorsed",
+    };
 
-        if (!endorsedRes.ok) {
-          const err = await endorsedRes.json();
-          toast.error(err.error || "Failed to save endorsed ticket.");
-          setLoading(false);
-          return;
-        }
-      }
+    const endorsedRes = await fetch("/api/act-save-endorsed-ticket", {
+      method: "POST", // <-- now POST
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(endorsedData),
+    });
+
+    if (!endorsedRes.ok) {
+      const err = await endorsedRes.json();
+      toast.error(err.error || "Failed to save endorsed ticket.");
+      setLoading(false);
+      return;
+    }
+
+    toast.success("Ticket successfully endorsed!");
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err.message || "Something went wrong.");
+  } finally {
+    setLoading(false);
+  }
+}
+
 
       toast.success("Activity saved successfully!");
       onCreated(newActivity);
