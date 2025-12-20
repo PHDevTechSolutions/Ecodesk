@@ -13,6 +13,7 @@ import {
 
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge"
 
 import {
   Sheet,
@@ -103,8 +104,13 @@ export function AccountsCard() {
           {loading && <p>Loading accounts...</p>}
           {error && <p className="text-destructive">{error}</p>}
           {!loading && !error && (
-            <p>
-              Total accounts: <strong>{totalAccounts}</strong>
+            <p className="flex justify-between items-center">
+              <span>Total accounts:</span>
+              <strong>
+                <Badge className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+                  {totalAccounts}
+                </Badge>
+              </strong>
             </p>
           )}
         </CardContent>

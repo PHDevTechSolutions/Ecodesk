@@ -239,7 +239,7 @@ export function MetricsCard({
                                     </TableCell>
 
                                     <TableCell className="text-right font-bold">
-                                        ₱{row.avgTransactionValue.toFixed(2)}
+                                        {row.avgTransactionValue.toFixed(2)}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -252,7 +252,7 @@ export function MetricsCard({
                                 <TableCell className="text-right">{totalQtySold.toLocaleString()}</TableCell>
                                 <TableCell className="text-right">{totalConverted.toLocaleString()}</TableCell>
                                 <TableCell className="text-right">{avgTransactionUnitTotal.toFixed(2)}</TableCell>
-                                <TableCell className="text-right">₱{avgTransactionValueTotal.toFixed(2)}</TableCell>
+                                <TableCell className="text-right">{avgTransactionValueTotal.toFixed(2)}</TableCell>
                             </TableRow>
                         </tfoot>
                     </Table>

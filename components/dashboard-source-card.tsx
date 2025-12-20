@@ -22,6 +22,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 // Tooltip component for info explanation
 function TooltipInfo({ children }: { children: React.ReactNode }) {
@@ -151,7 +152,9 @@ export function SourceCard({
                                     <ItemTitle>{source}</ItemTitle>
                                 </ItemContent>
                                 <ItemActions>
-                                    {count}
+                                    <Badge variant="outline" className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+                                        {count}
+                                    </Badge>
                                 </ItemActions>
                             </Item>
                         ))}
@@ -160,9 +163,9 @@ export function SourceCard({
             </CardContent>
             <Separator />
             <CardFooter className="flex justify-between items-center text-sm">
-                <div className="text-muted-foreground">
-                    Showing total source activity counts: <strong>{totalSourcesCount}</strong>
-                </div>
+                <Badge className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+                    Total: {totalSourcesCount}
+                </Badge>
                 <Button
                     onClick={downloadCSV}
                     type="button"

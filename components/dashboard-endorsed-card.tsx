@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge"
 
 interface Activity {
   status: string;
@@ -93,11 +94,14 @@ export function EndorsedCard({
         </CardHeader>
 
         <CardContent>
-          {loading && <p>Loading activities...</p>}
-          {error && <p className="text-destructive">{error}</p>}
           {!loading && !error && (
-            <p>
-              Total Endorsed activities: <strong>{endorsedCount}</strong>
+            <p className="flex justify-between items-center">
+              <span>Total Endorsed Tickets:</span>
+              <strong>
+                <Badge className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+                  {endorsedCount}
+                </Badge>
+              </strong>
             </p>
           )}
         </CardContent>

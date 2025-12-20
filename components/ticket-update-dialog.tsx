@@ -42,6 +42,7 @@ interface Activity {
   source_company: string;
   ticket_received: string;
   ticket_endorsed: string;
+  gender: string;
   channel: string;
   wrap_up: string;
   source: string;
@@ -86,6 +87,7 @@ interface UpdateActivityDialogProps {
   ticket_endorsed?: string;
   traffic?: string;
   source_company?: string;
+  gender: string;
   channel?: string;
   wrap_up?: string;
   source?: string;
@@ -156,6 +158,7 @@ export function UpdateTicketDialog({
   ticket_endorsed,
   traffic,
   source_company,
+  gender,
   channel,
   wrap_up,
   source,
@@ -193,6 +196,7 @@ export function UpdateTicketDialog({
   const [sourceCompanyState, setSourceCompany] = useState("");
   const [ticketReceivedState, setTicketReceived] = useState("");
   const [ticketEndorsedState, setTicketEndorsed] = useState("");
+  const [genderState, setGender] = useState("");
   const [channelState, setChannel] = useState("");
   const [wrapUpState, setWrapUp] = useState("");
   const [sourceState, setSource] = useState("");
@@ -229,6 +233,7 @@ export function UpdateTicketDialog({
     setSourceCompany(source_company || "");
     setTicketReceived(ticket_received || "");
     setTicketEndorsed(ticket_endorsed || "");
+    setGender(gender || "");
     setChannel(channel || "");
     setWrapUp(wrap_up || "");
     setSource(source || "");
@@ -261,6 +266,7 @@ export function UpdateTicketDialog({
     source_company,
     ticket_received,
     ticket_endorsed,
+    gender,
     channel,
     wrap_up,
     source,
@@ -313,6 +319,7 @@ export function UpdateTicketDialog({
       source_company: sourceCompanyState,
       ticket_received: ticketReceivedState,
       ticket_endorsed: ticketEndorsedState,
+      gender: genderState,
       channel: channelState,
       wrap_up: wrapUpState,
       source: sourceState,
@@ -608,6 +615,8 @@ export function UpdateTicketDialog({
                   setTicketReceived={setTicketReceived}
                   ticketEndorsed={ticketEndorsedState}
                   setTicketEndorsed={setTicketEndorsed}
+                  gender={genderState}
+                  setGender={setGender}
                   channel={channelState}
                   setChannel={setChannel}
                   wrapUp={wrapUpState}
