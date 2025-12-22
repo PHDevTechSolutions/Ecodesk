@@ -27,6 +27,11 @@ import { ClosedCard } from "@/components/dashboard-closed-card";
 import { EndorsedCard } from "@/components/dashboard-endorsed-card";
 import { ConvertedSalesCard } from "@/components/dashboard-converted-sales-card";
 import { MetricsCard } from "@/components/dashboard-metrics-card";
+import { WeeklyInboundCard } from "@/components/dashboard-weekly-inbound-card";
+import { InboundTrafficGenderCard } from "@/components/dashboard-inbound-traffic-gender-card";
+import { CustomerStatusCard } from "@/components/dashboard-customer-status-card";
+import { CustomerTypeCard } from "@/components/dashboard-customer-type-card";
+import { SourceCompanyCard } from "@/components/dashboard-source-company-card";
 import { ChannelCard } from "@/components/dashboard-channel-card";
 import { SourceCard } from "@/components/dashboard-source-card";
 
@@ -37,7 +42,14 @@ interface UserDetails {
   manager?: string;
 }
 
+interface Company {
+  account_reference_number: string;
+  company_name: string;
+  contact_person: string;
+}
+
 interface Activity {
+  account_reference_number: string;
   referenceid: string;
   channel?: string;
   source: string;
@@ -45,6 +57,12 @@ interface Activity {
   traffic: string;
   so_amount: string;
   qty_sold: string;
+  gender: string;
+  customer_status: string;
+  customer_type: string;
+  source_company: string;
+  company_name: string;
+  contact_person?: string;
 }
 
 function DashboardContent() {
@@ -66,6 +84,10 @@ function DashboardContent() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [errorActivities, setErrorActivities] = useState<string | null>(null);
+
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
 
   const queryUserId = searchParams?.get("id") ?? "";
 
@@ -124,6 +146,29 @@ function DashboardContent() {
     fetchUserData();
   }, [userId]);
 
+  const fetchCompanies = useCallback(async () => {
+    setLoadingCompanies(true);
+    setErrorCompanies(null);
+
+    try {
+      const res = await fetch("/api/com-fetch-account", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch company data");
+      const data = await res.json();
+      setCompanies(data.data || []);
+    } catch (err: any) {
+      setErrorCompanies(err.message || "Error fetching company data");
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, []);
+
   // Fetch activities by referenceid
   const fetchActivities = useCallback(async () => {
     if (!userDetails.referenceid) {
@@ -152,13 +197,33 @@ function DashboardContent() {
       }
 
       const json = await res.json();
-      setActivities(json.data || []);
+      const fetchedActivities: Activity[] = json.data || [];
+
+      // Merge company info by matching account_reference_number
+      const mergedActivities = fetchedActivities.map((activity) => {
+        const matchedCompany = companies.find(
+          (comp) =>
+            comp.account_reference_number === activity.account_reference_number
+        );
+        return {
+          ...activity,
+          company_name: matchedCompany?.company_name ?? "",
+          contact_person: matchedCompany?.contact_person ?? "",
+        };
+      });
+
+      setActivities(mergedActivities);
     } catch (error: any) {
       setErrorActivities(error.message || "Error fetching activities");
     } finally {
       setLoadingActivities(false);
     }
-  }, [userDetails.referenceid]);
+  }, [userDetails.referenceid, companies]);
+
+  // Fetch companies on mount or when user changes
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
 
   useEffect(() => {
     fetchActivities();
@@ -210,11 +275,19 @@ function DashboardContent() {
               dateCreatedFilterRange={dateCreatedFilterRange}
               setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
             />
-            
+
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <MetricsCard
+              activities={activities}
+              loading={loadingActivities}
+              error={errorActivities}
+              dateCreatedFilterRange={dateCreatedFilterRange}
+              setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+            />
+
+            <WeeklyInboundCard
               activities={activities}
               loading={loadingActivities}
               error={errorActivities}
@@ -231,6 +304,40 @@ function DashboardContent() {
             />
 
             <SourceCard
+              activities={activities}
+              loading={loadingActivities}
+              error={errorActivities}
+              dateCreatedFilterRange={dateCreatedFilterRange}
+              setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <InboundTrafficGenderCard
+              activities={activities}
+              loading={loadingActivities}
+              error={errorActivities}
+              dateCreatedFilterRange={dateCreatedFilterRange}
+              setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+            />
+
+            <CustomerStatusCard
+              activities={activities}
+              loading={loadingActivities}
+              error={errorActivities}
+              dateCreatedFilterRange={dateCreatedFilterRange}
+              setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+            />
+
+            <CustomerTypeCard
+              activities={activities}
+              loading={loadingActivities}
+              error={errorActivities}
+              dateCreatedFilterRange={dateCreatedFilterRange}
+              setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+            />
+
+            <SourceCompanyCard
               activities={activities}
               loading={loadingActivities}
               error={errorActivities}

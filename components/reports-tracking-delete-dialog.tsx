@@ -3,6 +3,14 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"; // Import your Dialog components
 
 interface HideRecordModalProps {
   isOpen: boolean;
@@ -48,18 +56,23 @@ export const HideRecordModal: React.FC<HideRecordModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded p-6 w-96">
-        <h3 className="text-lg font-semibold mb-4">Do you want to delete this record?</h3>
-        <div className="flex justify-end gap-2">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete this record?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onClose} disabled={loading}>
-            No
+            Cancel
           </Button>
           <Button variant="destructive" onClick={handleHide} disabled={loading}>
-            Yes
+            {loading ? "Deleting..." : "Delete"}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

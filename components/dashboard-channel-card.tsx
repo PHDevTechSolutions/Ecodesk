@@ -22,6 +22,7 @@ import {
 
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 // Tooltip component for info
 function TooltipInfo({ children }: { children: React.ReactNode }) {
@@ -190,13 +191,14 @@ export function ChannelCard({
       </CardContent>
       <Separator />
       <CardFooter className="flex justify-between items-center text-sm">
-        <div className="text-muted-foreground">
-          Showing total channel activity counts: <strong>{totalChannelsCount}</strong>
-        </div>
+        <Badge className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+          Total: {totalChannelsCount}
+        </Badge>
         <Button
           onClick={downloadCSV}
           type="button"
           aria-label="Download channel counts CSV"
+          className="bg-green-500 text-white hover:bg-green-600"
         >
           Download CSV
         </Button>

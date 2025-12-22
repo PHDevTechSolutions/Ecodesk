@@ -48,6 +48,7 @@ interface Ticket {
     ticket_endorsed?: string;
     traffic?: string;
     source_company?: string;
+    gender: string;
     channel?: string;
     wrap_up?: string;
     source?: string;
@@ -315,7 +316,6 @@ export const Ticket: React.FC<TicketProps> = ({
                 );
             });
         }
-
 
         // Step 2: UI filters from filters object
         Object.entries(filters).forEach(([key, val]) => {
@@ -863,8 +863,9 @@ export const Ticket: React.FC<TicketProps> = ({
                         variant="outline"
                         disabled={filteredActivities.length === 0}
                         onClick={() => handleExportCsv(filteredActivities)}
+                        className="bg-green-500 text-white hover:bg-green-600"
                     >
-                        Export CSV
+                        Download CSV
                     </Button>
 
                     <Button
@@ -942,6 +943,7 @@ export const Ticket: React.FC<TicketProps> = ({
                                                                 ticket_endorsed: item.ticket_endorsed,
                                                                 traffic: item.traffic,
                                                                 source_company: item.source_company,
+                                                                gender: item.gender,
                                                                 channel: item.channel,
                                                                 wrap_up: item.wrap_up,
                                                                 source: item.source,

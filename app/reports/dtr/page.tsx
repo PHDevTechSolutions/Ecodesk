@@ -19,11 +19,20 @@ import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-// IMPORT EDIT MODAL
-import { EditRecordModal } from "./edit-record-modal";
-// IMPORT HIDE MODAL
-import { HideRecordModal } from "./hide-record-modal";
+import { AddRecordModal } from "@/components/reports-tracking-add-dialog";
+import { EditRecordModal } from "@/components/reports-tracking-edit-dialog";
+import { HideRecordModal } from "@/components/reports-tracking-delete-dialog";
+import { toast } from "sonner";
 
 function DTrackingContent() {
   const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = useState<any>(undefined);
@@ -44,6 +53,10 @@ function DTrackingContent() {
   const [hideModalOpen, setHideModalOpen] = useState(false);
   const [recordToHide, setRecordToHide] = useState<any>(null);
 
+  const [addModalOpen, setAddModalOpen] = useState(false);
+
+  const [referenceId, setReferenceId] = useState<string>("");
+
   const filterColumns = [
     "All",
     "Company",
@@ -59,6 +72,7 @@ function DTrackingContent() {
     "Remarks",
   ];
 
+  // Sync URL query param with userId context
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const queryUserId = searchParams.get("id") ?? "";
@@ -67,9 +81,25 @@ function DTrackingContent() {
     }
   }, [userId, setUserId]);
 
-  const handleAddRecord = () => {
-    router.push(`/reports/dtr/add-record?id=${userId}`);
-  };
+  // Fetch user details when userId changes
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch(`/api/user?id=${encodeURIComponent(userId)}`);
+        if (!response.ok) throw new Error("Failed to fetch user data");
+        const data = await response.json();
+        setReferenceId(data.ReferenceID || "");
+        toast.success("User data loaded successfully!");
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+        toast.error("Failed to connect to server. Please try again later or refresh your network connection");
+      }
+    };
+
+    fetchUserData();
+  }, [userId]);
 
   // Fetch records (only active)
   useEffect(() => {
@@ -78,7 +108,6 @@ function DTrackingContent() {
         const res = await fetch("/api/d-tracking-fetch-record");
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          // 🔹 Filter out inactive records just in case
           const activeRecords = json.data.filter((r: any) => r.isActive !== false);
           setRecords(activeRecords);
         } else {
@@ -158,9 +187,9 @@ function DTrackingContent() {
         `"${r.status}"`,
         `"${r.nature_of_concern}"`,
         `"${r.remarks ?? ""}"`,
-        `"${r.endorsed_date ? new Date(r.endorsed_date).toLocaleString() : ""}"`,
-        `"${r.closed_date ? new Date(r.closed_date).toLocaleString() : ""}"`,
-        `"${new Date(r.date_created).toLocaleString()}"`,
+        `"${r.endorsed_date ?? ""}"`,
+        `"${r.closed_date ?? ""}"`,
+        `"${r.date_created ?? ""}"`,
       ].join(","))
     ].join("\n");
 
@@ -192,77 +221,83 @@ function DTrackingContent() {
 
         <main className="flex flex-1 flex-col gap-4 p-4 overflow-auto">
           <div className="border rounded p-4 space-y-4">
-            <div className="flex justify-between items-center gap-2">
-              <h2 className="text-xl font-semibold">D-Tracking Records</h2>
-              <div className="flex gap-2">
-                <Button className="bg-green-500 text-white hover:bg-green-600" onClick={handleDownloadCSV}>Download CSV</Button>
-                <Button onClick={handleAddRecord}>Add Record</Button>
+            {/* Search + Add + Filter */}
+            <div className="flex justify-between items-center gap-2 relative">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-100"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+                <Button onClick={() => setAddModalOpen(true)}>Add Record</Button>
               </div>
-            </div>
 
-            {/* Search with Filter */}
-            <div className="flex justify-end items-center gap-2 relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="border rounded px-2 py-1 w-64"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              />
-              <button
-                className="border rounded px-2 py-1 flex items-center gap-1 hover:bg-gray-100"
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              >
-                Filter: {filterBy}
-              </button>
+              <div className="flex items-center gap-2 relative">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  Filter: {filterBy}
+                </Button>
+                <Button
+                  className="bg-green-500 text-white hover:bg-green-600"
+                  onClick={handleDownloadCSV}
+                >
+                  Download CSV
+                </Button>
 
-              {showFilterDropdown && (
-                <div className="absolute right-0 top-10 bg-white border rounded shadow-md z-10 w-52">
-                  {filterColumns.map((col) => (
-                    <div
-                      key={col}
-                      className={`px-3 py-1 cursor-pointer hover:bg-gray-100 ${
-                        filterBy === col ? "font-semibold bg-gray-200" : ""
-                      }`}
-                      onClick={() => {
-                        setFilterBy(col);
-                        setShowFilterDropdown(false);
-                        setCurrentPage(1);
-                      }}
-                    >
-                      {col}
-                    </div>
-                  ))}
-                </div>
-              )}
+                {showFilterDropdown && (
+                  <div className="absolute right-0 top-10 bg-white border rounded shadow-md z-10 w-52">
+                    {filterColumns.map((col) => (
+                      <div
+                        key={col}
+                        className={`px-3 py-1 cursor-pointer hover:bg-gray-100 ${filterBy === col ? "font-semibold bg-gray-200" : ""}`}
+                        onClick={() => {
+                          setFilterBy(col);
+                          setShowFilterDropdown(false);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        {col}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Table */}
             <div className="overflow-auto">
-              <table className="w-full table-auto border-collapse border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border px-2 py-1">Actions</th>
-                    <th className="border px-2 py-1">Company</th>
-                    <th className="border px-2 py-1">Customer Name</th>
-                    <th className="border px-2 py-1">Contact Number</th>
-                    <th className="border px-2 py-1">Ticket Type</th>
-                    <th className="border px-2 py-1">Ticket Concern</th>
-                    <th className="border px-2 py-1">Department</th>
-                    <th className="border px-2 py-1">Sales Agent</th>
-                    <th className="border px-2 py-1">TSM</th>
-                    <th className="border px-2 py-1">Status</th>
-                    <th className="border px-2 py-1">Nature of Concern</th>
-                    <th className="border px-2 py-1">Remarks</th>
-                    <th className="border px-2 py-1">Endorsed Date</th>
-                    <th className="border px-2 py-1">Closed Date</th>
-                    <th className="border px-2 py-1">Date Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedRecords.map((r: any) => (
-                    <tr key={r._id} className="hover:bg-gray-50">
-                      <td className="border px-2 py-1 flex gap-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Actions</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Customer Name</TableHead>
+                    <TableHead>Contact Number</TableHead>
+                    <TableHead>Ticket Type</TableHead>
+                    <TableHead>Ticket Concern</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Sales Agent</TableHead>
+                    <TableHead>TSM</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Nature of Concern</TableHead>
+                    <TableHead>Remarks</TableHead>
+                    <TableHead>Endorsed Date</TableHead>
+                    <TableHead>Closed Date</TableHead>
+                    <TableHead>Date Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {records.map((r: any) => (
+                    <TableRow key={r._id ?? r.company_name + r.customer_name}>
+                      <TableCell className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -283,35 +318,52 @@ function DTrackingContent() {
                         >
                           Delete
                         </Button>
-                      </td>
-                      <td className="border px-2 py-1">{r.company_name}</td>
-                      <td className="border px-2 py-1">{r.customer_name}</td>
-                      <td className="border px-2 py-1">{r.contact_number}</td>
-                      <td className="border px-2 py-1">{r.ticket_type}</td>
-                      <td className="border px-2 py-1">{r.ticket_concern}</td>
-                      <td className="border px-2 py-1">{r.department}</td>
-                      <td className="border px-2 py-1">{r.sales_agent}</td>
-                      <td className="border px-2 py-1">{r.tsm}</td>
-                      <td className="border px-2 py-1">{r.status}</td>
-                      <td className="border px-2 py-1">{r.nature_of_concern}</td>
-                      <td className="border px-2 py-1">{r.remarks || "—"}</td>
-                      <td className="border px-2 py-1">{r.endorsed_date ? new Date(r.endorsed_date).toLocaleString() : "—"}</td>
-                      <td className="border px-2 py-1">{r.closed_date ? new Date(r.closed_date).toLocaleString() : "—"}</td>
-                      <td className="border px-2 py-1">{new Date(r.date_created).toLocaleString()}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="uppercase">{r.company_name}</TableCell>
+                      <TableCell className="capitalize">{r.customer_name}</TableCell>
+                      <TableCell>{r.contact_number}</TableCell>
+                      <TableCell>{r.ticket_type}</TableCell>
+                      <TableCell>{r.ticket_concern}</TableCell>
+                      <TableCell>{r.department}</TableCell>
+                      <TableCell>{r.sales_agent}</TableCell>
+                      <TableCell>{r.tsm}</TableCell>
+                      <TableCell>{r.status}</TableCell>
+                      <TableCell>{r.nature_of_concern}</TableCell>
+                      <TableCell>{r.remarks || "—"}</TableCell>
+                      <TableCell>{r.endorsed_date ?? "—"}</TableCell>
+                      <TableCell>{r.closed_date ?? "—"}</TableCell>
+                      <TableCell>{r.date_created ?? "—"}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex justify-end gap-2 mt-2">
-                <Button onClick={handlePrevPage} disabled={currentPage === 1}>Prev</Button>
-                <span className="px-2 py-1">{currentPage} / {totalPages}</span>
-                <Button onClick={handleNextPage} disabled={currentPage === totalPages}>Next</Button>
+              <div className="mt-4 flex justify-center items-center space-x-2 text-xs">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Prev
+                </Button>
+                <span>
+                  Page {currentPage} / {totalPages || 1}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
               </div>
             )}
+
           </div>
         </main>
       </SidebarInset>
@@ -320,6 +372,17 @@ function DTrackingContent() {
         userId={userId ?? undefined}
         dateCreatedFilterRange={dateCreatedFilterRange}
         setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+      />
+
+      {/* ADD MODAL */}
+      <AddRecordModal
+        isOpen={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        referenceId={referenceId}
+        onSave={(newRecord) => {
+          setRecords((prev) => [newRecord, ...prev]);
+          setAddModalOpen(false);
+        }}
       />
 
       {/* EDIT MODAL */}
@@ -340,7 +403,6 @@ function DTrackingContent() {
         onClose={() => setHideModalOpen(false)}
         record={recordToHide}
         onHide={(updatedRecord) => {
-          // Remove the hidden record from state immediately
           setRecords((prev) =>
             prev.filter((r) => r._id !== updatedRecord._id)
           );

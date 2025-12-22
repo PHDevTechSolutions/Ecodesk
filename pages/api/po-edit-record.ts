@@ -1,5 +1,6 @@
+// pages/api/po-edit-record.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB;
@@ -42,12 +43,15 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") {
+  if (req.method !== "PUT") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   try {
     const {
+      id,
+      _id: _idFromBody,
+
       referenceid,
 
       company_name,
@@ -71,18 +75,21 @@ export default async function handler(
       status,
     } = req.body;
 
-    /* 🔒 Basic validation (minimal scaffold) */
+    const recordId = id || _idFromBody;
+
+    /* 🔒 Basic validation */
+    if (!recordId) {
+      return res.status(400).json({ error: "Record ID (_id or id) is required" });
+    }
     if (!company_name || !po_number || !status) {
-      return res.status(400).json({
-        error: "Missing required fields",
-      });
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
     const { db } = await connectToDatabase();
     const collection = db.collection("po");
 
-    /* 📌 Build document */
-    const newRecord = {
+    /* 📌 Build update document */
+    const updateDoc: any = {
       referenceid,
 
       company_name,
@@ -105,24 +112,27 @@ export default async function handler(
 
       status,
 
-      isActive: true,
-      date_created: new Date().toISOString(),
+      date_updated: new Date().toISOString(),
     };
 
-    const result = await collection.insertOne(newRecord);
+    const result = await collection.updateOne(
+      { _id: new ObjectId(recordId) },
+      { $set: updateDoc }
+    );
 
-    if (!result.acknowledged) {
-      throw new Error("Failed to insert PO record");
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "PO record not found" });
     }
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      insertedId: result.insertedId,
+      message: "PO record updated successfully",
+      updatedRecord: { _id: recordId, ...updateDoc },
     });
   } catch (error: any) {
-    console.error("MongoDB insert error (PO):", error);
+    console.error("MongoDB update error (PO):", error);
     return res.status(500).json({
-      error: error.message || "Failed to add PO record",
+      error: error.message || "Failed to update PO record",
     });
   }
 }

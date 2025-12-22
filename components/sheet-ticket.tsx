@@ -46,6 +46,8 @@ interface TicketSheetProps {
     setTicketReceived: React.Dispatch<React.SetStateAction<string>>;
     ticketEndorsed: string;
     setTicketEndorsed: React.Dispatch<React.SetStateAction<string>>;
+    gender: string;
+    setGender: React.Dispatch<React.SetStateAction<string>>;
     channel: string;
     setChannel: React.Dispatch<React.SetStateAction<string>>;
     wrapUp: string;
@@ -215,6 +217,8 @@ export function TicketSheet(props: TicketSheetProps) {
         setTicketReceived,
         ticketEndorsed,
         setTicketEndorsed,
+        gender,
+        setGender,
         channel,
         setChannel,
         wrapUp,
@@ -304,7 +308,7 @@ export function TicketSheet(props: TicketSheetProps) {
         groupedActivities.find((act) => act.so_amount)?.so_amount ?? "N/A";
 
     const productQuantityFromActivity =
-        groupedActivities.find((act) => act.product_quantity)?.product_quantity ?? "N/A";    
+        groupedActivities.find((act) => act.product_quantity)?.product_quantity ?? "N/A";
 
     const handleApplySO = () => {
         if (soNumberFromActivity !== "N/A") {
@@ -584,6 +588,22 @@ export function TicketSheet(props: TicketSheetProps) {
                                     value={ticketEndorsed}
                                     onChange={(e) => setTicketEndorsed(e.target.value)}
                                     error={errors.ticketEndorsed}
+                                />
+                            </Field>
+
+                            <Field>
+                                <FieldLabel>Gender</FieldLabel>
+                                <FieldDescription>
+                                    Select the customer's gender for segmentation and analysis purposes.
+                                </FieldDescription>
+                                <SelectField
+                                    value={gender}
+                                    onChange={setGender}
+                                    placeholder="Select a gender"
+                                    options={[
+                                        { value: "Male", label: "Male" },
+                                        { value: "Female", label: "Female" },
+                                    ]}
                                 />
                             </Field>
 

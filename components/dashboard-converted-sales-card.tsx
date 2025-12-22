@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge"
 
 interface Activity {
   status: string;
@@ -108,14 +109,28 @@ export function ConvertedSalesCard({
           {loading && <p>Loading activities...</p>}
           {error && <p className="text-destructive">{error}</p>}
           {!loading && !error && (
-            <>
-              <p>
-                Total Converted activities: <strong>{endorsedCount}</strong>
+            <div className="flex flex-col gap-4">
+              <p className="flex justify-between items-center">
+                <span>Total Converted activities:</span>
+                <strong>
+                  <Badge className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+                    {endorsedCount}
+                  </Badge>
+                </strong>
               </p>
-              <p>
-                Total SO Amount: <strong>₱{totalSoAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-              </p>
-            </>
+              <Separator />
+              {totalSoAmount > 0 && (
+                <p className="flex justify-between items-center">
+                  <span>Total SO Amount:</span>
+                  <strong>
+                    <Badge className="h-10 min-w-10 rounded-full px-3 font-mono tabular-nums">
+                      ₱{totalSoAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Badge>
+                  </strong>
+                </p>
+              )}
+
+            </div>
           )}
         </CardContent>
       </Card>
