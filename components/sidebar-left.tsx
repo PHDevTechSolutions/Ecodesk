@@ -45,7 +45,7 @@ const data = {
     },
   ],
   navSecondary: [
-    { title: "Help", url: "/settings", icon: HelpCircle },
+    { title: "Help", url: "/help", icon: HelpCircle },
     { title: "Calendar", url: "/calendar", icon: CalendarDays },
     { title: "Settings", url: "/settings", icon: Settings },
   ],
