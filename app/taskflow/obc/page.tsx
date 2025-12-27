@@ -1,5 +1,6 @@
 "use client";
 
+import { FaFilter } from "react-icons/fa";
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SidebarLeft } from "@/components/sidebar-left";
@@ -16,6 +17,8 @@ import {
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -24,12 +27,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { DateRange } from "react-day-picker";
+import { ObcCallsFilterDialog } from "@/components/ob-calls-filter-dialog";
 
 type OBCRecord = {
   activity_reference_number: string;
@@ -53,6 +55,17 @@ type OBCRecord = {
 
 const PAGE_SIZE = 10;
 
+const defaultFilters = {
+  type_client: "All",
+  source: "All",
+  type_activity: "All",
+  call_status: "All",
+  call_type: "All",
+  status: "All",
+  tsm: "All",
+  manager: "All",
+};
+
 function OBCContent() {
   const searchParams = useSearchParams();
   const { userId, setUserId } = useUser();
@@ -66,14 +79,33 @@ function OBCContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // FILTER & SEARCH STATE
+  const [filters, setFilters] = useState({ ...defaultFilters });
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-
   const [dateCreatedFilterRange, setDateCreatedFilterRange] = useState<DateRange | undefined>(undefined);
-  const [typeClientFilter, setTypeClientFilter] = useState<string | null>(null);
-  const [callStatusFilter, setCallStatusFilter] = useState<string | null>(null);
-  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
 
+  const highlightMatch = (text: string | null | undefined) => {
+  if (!text) return "-";
+  if (!search) return text;
+  const regex = new RegExp(`(${search})`, "gi");
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === search.toLowerCase() ? (
+          <mark key={i} className="bg-yellow-100">{part}</mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+};
+
+
+  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -90,90 +122,85 @@ function OBCContent() {
     fetchData();
   }, []);
 
-  /** 🔍 SEARCH — lahat ng fields */
+  // FILTERED DATA
   const filtered = useMemo(() => {
-    let filteredRecords = records;
+    return records.filter((r) => {
+      const matchesFilters =
+        (filters.type_client === "All" || r.type_client === filters.type_client) &&
+        (filters.source === "All" || r.source === filters.source) &&
+        (filters.type_activity === "All" || r.type_activity === filters.type_activity) &&
+        (filters.call_status === "All" || r.call_status === filters.call_status) &&
+        (filters.call_type === "All" || r.call_type === filters.call_type) &&
+        (filters.status === "All" || r.status === filters.status) &&
+        (filters.tsm === "All" || r.tsm === filters.tsm) &&
+        (filters.manager === "All" || r.manager === filters.manager);
 
-    if (search) {
-      const q = search.toLowerCase();
-      filteredRecords = filteredRecords.filter((r) =>
+      const matchesSearch =
+        !search ||
         Object.values(r)
           .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q))
-      );
-    }
+          .some((v) => String(v).toLowerCase().includes(search.toLowerCase()));
 
-    if (typeClientFilter) {
-      filteredRecords = filteredRecords.filter(
-        (r) => r.type_client.toLowerCase() === typeClientFilter.toLowerCase()
-      );
-    }
+      const matchesDate =
+        !dateCreatedFilterRange ||
+        (r.date_created &&
+          new Date(r.date_created) >= (dateCreatedFilterRange?.from || new Date(-8640000000000000)) &&
+          new Date(r.date_created) <= (dateCreatedFilterRange?.to || new Date(8640000000000000)));
 
-    if (callStatusFilter) {
-      filteredRecords = filteredRecords.filter(
-        (r) => r.call_status.toLowerCase() === callStatusFilter.toLowerCase()
-      );
-    }
+      return matchesFilters && matchesSearch && matchesDate;
+    });
+  }, [records, filters, search, dateCreatedFilterRange]);
 
-    if (sourceFilter) {
-      filteredRecords = filteredRecords.filter(
-        (r) => r.source.toLowerCase() === sourceFilter.toLowerCase()
-      );
-    }
-
-    return filteredRecords;
-  }, [records, search, typeClientFilter, callStatusFilter, sourceFilter]);
-
-  /** 📄 PAGINATION */
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // CSV Download Handler
+  // CSV Download
   const handleDownloadCSV = () => {
-    const csvRows: string[] = [];
-
-    // Get the headers of the table
     const headers = [
-      'Activity Ref #', 'ReferenceID', 'TSM', 'Manager', 'Type Client', 
-      'Source', 'Type Activity', 'Call Status', 'Call Type', 'Remarks', 
-      'Status', 'Start Date', 'End Date', 'Date Followup', 'Date Created', 
+      'Activity Ref #', 'ReferenceID', 'TSM', 'Manager', 'Type Client',
+      'Source', 'Type Activity', 'Call Status', 'Call Type', 'Remarks',
+      'Status', 'Start Date', 'End Date', 'Date Followup', 'Date Created',
       'Date Updated', 'Account Ref #'
     ];
-    csvRows.push(headers.join(','));
-
-    // Add each row of data
-    filtered.forEach((record) => {
-      const row = [
-        record.activity_reference_number || "-", 
-        record.referenceid || "-", 
-        record.tsm || "-", 
-        record.manager || "-", 
-        record.type_client || "-", 
-        record.source || "-", 
-        record.type_activity || "-", 
-        record.call_status || "-", 
-        record.call_type || "-", 
-        record.remarks || "-", 
-        record.status || "-", 
-        record.start_date || "-", 
-        record.end_date || "-", 
-        record.date_followup || "-", 
-        record.date_created || "-", 
-        record.date_updated || "-", 
-        record.account_reference_number || "-"
-      ];
-      csvRows.push(row.join(','));
+    const csvRows = [headers.join(',')];
+    filtered.forEach((r) => {
+      csvRows.push([
+        r.activity_reference_number || "-",
+        r.referenceid || "-",
+        r.tsm || "-",
+        r.manager || "-",
+        r.type_client || "-",
+        r.source || "-",
+        r.type_activity || "-",
+        r.call_status || "-",
+        r.call_type || "-",
+        r.remarks || "-",
+        r.status || "-",
+        r.start_date || "-",
+        r.end_date || "-",
+        r.date_followup || "-",
+        r.date_created || "-",
+        r.date_updated || "-",
+        r.account_reference_number || "-",
+      ].join(','));
     });
-
-    // Create a Blob for CSV file and trigger download
-    const csvData = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const csvUrl = URL.createObjectURL(csvData);
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = csvUrl;
+    a.href = url;
     a.download = 'outbound_calls.csv';
     a.click();
-    URL.revokeObjectURL(csvUrl);
+    URL.revokeObjectURL(url);
   };
+
+  // CLEAR FILTERS BUTTON STATE
+  const isFilterActive = useMemo(() => {
+    return (
+      search !== "" ||
+      Object.entries(filters).some(([_, v]) => v !== "All") ||
+      !!dateCreatedFilterRange
+    );
+  }, [search, filters, dateCreatedFilterRange]);
 
   return (
     <>
@@ -191,8 +218,7 @@ function OBCContent() {
           </Breadcrumb>
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 p-4">
-          {/* HEADER TEXT */}
+        <main className="flex flex-col gap-4 p-4">
           <div>
             <h1 className="text-xl font-semibold">Outbound Calls</h1>
             <p className="text-sm text-muted-foreground mt-1 max-w-5xl">
@@ -200,61 +226,38 @@ function OBCContent() {
             </p>
           </div>
 
-          {/* SEARCH AND FILTER + DOWNLOAD CSV */}
-          <div className="flex justify-between gap-3 items-center">
-            {/* SEARCH AND FILTER */}
-            <div className="flex gap-3">
-              <Input
-                placeholder="Search outbound calls..."
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                className="max-w-sm"
-              />
-
-              {/* Filter by Client Type */}
-              <select
-                className="border rounded p-2"
-                value={typeClientFilter ?? ""}
-                onChange={(e) => setTypeClientFilter(e.target.value || null)}
+          {/* SEARCH LEFT, ACTIONS RIGHT */}
+          <div className="flex flex-wrap justify-between gap-2 items-center">
+            <Input
+              placeholder="Search outbound calls..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="max-w-md flex-1"
+            />
+            <div className="flex gap-2 flex-wrap">
+              {isFilterActive && (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setFilters({ ...defaultFilters });
+                    setSearch("");
+                    setPage(1);
+                    setDateCreatedFilterRange(undefined);
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setFilterDialogOpen(true)}>
+                <FaFilter /> Filter
+              </Button>
+              <Button
+                className="bg-green-500 text-white hover:bg-green-600"
+                onClick={handleDownloadCSV}
               >
-                <option value="">Filter by Client Type</option>
-                <option value="CSR Client">CSR Client</option>
-                <option value="TSA Client">TSA Client</option>
-              </select>
-
-              {/* Filter by Call Status */}
-              <select
-                className="border rounded p-2"
-                value={callStatusFilter ?? ""}
-                onChange={(e) => setCallStatusFilter(e.target.value || null)}
-              >
-                <option value="">Filter by Call Status</option>
-                <option value="Successful">Successful</option>
-                <option value="Unsuccessful">Unsuccessful</option>
-              </select>
-
-              {/* Filter by Source */}
-              <select
-                className="border rounded p-2"
-                value={sourceFilter ?? ""}
-                onChange={(e) => setSourceFilter(e.target.value || null)}
-              >
-                <option value="">Filter by Source</option>
-                <option value="Outbound - Touchbase">Outbound - Touchbase</option>
-                <option value="Outbound - Follow-up">Outbound - Follow-up</option>
-              </select>
+                Download CSV
+              </Button>
             </div>
-
-            {/* Download CSV Button */}
-            <Button
-              className="bg-green-500 text-white hover:bg-green-600"
-              onClick={handleDownloadCSV}
-            >
-              Download CSV
-            </Button>
           </div>
 
           {loading && (
@@ -266,78 +269,77 @@ function OBCContent() {
           {error && <p className="text-destructive">{error}</p>}
 
           {!loading && paginated.length > 0 && (
-            <>
-              <div className="overflow-auto">
-                <Table className="min-w-[2600px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Activity Ref #</TableHead>
-                      <TableHead>ReferenceID</TableHead>
-                      <TableHead>TSM</TableHead>
-                      <TableHead>Manager</TableHead>
-                      <TableHead>Type Client</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Type Activity</TableHead>
-                      <TableHead>Call Status</TableHead>
-                      <TableHead>Call Type</TableHead>
-                      <TableHead>Remarks</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead>Date Followup</TableHead>
-                      <TableHead>Date Created</TableHead>
-                      <TableHead>Date Updated</TableHead>
-                      <TableHead>Account Ref #</TableHead>
+            <div className="overflow-auto">
+              <Table className="min-w-[2600px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Activity Ref #</TableHead>
+                    <TableHead>ReferenceID</TableHead>
+                    <TableHead>TSM</TableHead>
+                    <TableHead>Manager</TableHead>
+                    <TableHead>Type Client</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Type Activity</TableHead>
+                    <TableHead>Call Status</TableHead>
+                    <TableHead>Call Type</TableHead>
+                    <TableHead>Remarks</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Date Followup</TableHead>
+                    <TableHead>Date Created</TableHead>
+                    <TableHead>Date Updated</TableHead>
+                    <TableHead>Account Ref #</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginated.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{highlightMatch(r.activity_reference_number)}</TableCell>
+                      <TableCell>{highlightMatch(r.referenceid)}</TableCell>
+                      <TableCell>{highlightMatch(r.tsm)}</TableCell>
+                      <TableCell>{highlightMatch(r.manager)}</TableCell>
+                      <TableCell>{highlightMatch(r.type_client)}</TableCell>
+                      <TableCell>{highlightMatch(r.source)}</TableCell>
+                      <TableCell>{highlightMatch(r.type_activity)}</TableCell>
+                      <TableCell>{highlightMatch(r.call_status)}</TableCell>
+                      <TableCell>{highlightMatch(r.call_type)}</TableCell>
+                      <TableCell>{highlightMatch(r.remarks)}</TableCell>
+                      <TableCell>{highlightMatch(r.status)}</TableCell>
+                      <TableCell>{highlightMatch(r.start_date)}</TableCell>
+                      <TableCell>{highlightMatch(r.end_date)}</TableCell>
+                      <TableCell>{highlightMatch(r.date_followup)}</TableCell>
+                      <TableCell>{highlightMatch(r.date_created)}</TableCell>
+                      <TableCell>{highlightMatch(r.date_updated)}</TableCell>
+                      <TableCell>{highlightMatch(r.account_reference_number)}</TableCell>
                     </TableRow>
-                  </TableHeader>
+                  ))}
+                </TableBody>
+              </Table>
 
-                  <TableBody>
-                    {paginated.map((r, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{r.activity_reference_number || "-"}</TableCell>
-                        <TableCell>{r.referenceid || "-"}</TableCell>
-                        <TableCell>{r.tsm || "-"}</TableCell>
-                        <TableCell>{r.manager || "-"}</TableCell>
-                        <TableCell>{r.type_client || "-"}</TableCell>
-                        <TableCell>{r.source || "-"}</TableCell>
-                        <TableCell>{r.type_activity || "-"}</TableCell>
-                        <TableCell>{r.call_status || "-"}</TableCell>
-                        <TableCell>{r.call_type || "-"}</TableCell>
-                        <TableCell>{r.remarks || "-"}</TableCell>
-                        <TableCell>{r.status || "-"}</TableCell>
-                        <TableCell>{r.start_date || "-"}</TableCell>
-                        <TableCell>{r.end_date || "-"}</TableCell>
-                        <TableCell>{r.date_followup || "-"}</TableCell>
-                        <TableCell>{r.date_created || "-"}</TableCell>
-                        <TableCell>{r.date_updated || "-"}</TableCell>
-                        <TableCell>{r.account_reference_number || "-"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* PAGINATION */}
-              <div className="flex justify-end items-center gap-3">
-                <Button
-                  variant="outline"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  Prev
-                </Button>
-                <span className="text-sm">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
-              </div>
-            </>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-end items-center gap-3 mt-2">
+                  <Button
+                    variant="outline"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    Prev
+                  </Button>
+                  <span className="text-sm">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    disabled={page === totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
         </main>
       </SidebarInset>
@@ -346,6 +348,13 @@ function OBCContent() {
         userId={userId ?? undefined}
         dateCreatedFilterRange={dateCreatedFilterRange}
         setDateCreatedFilterRangeAction={setDateCreatedFilterRange}
+      />
+
+      <ObcCallsFilterDialog
+        isOpen={filterDialogOpen}
+        onClose={() => setFilterDialogOpen(false)}
+        filters={filters}
+        setFilters={setFilters}
       />
     </>
   );
