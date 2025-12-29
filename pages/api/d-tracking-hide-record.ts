@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!id) return res.status(400).json({ error: "Record ID is required." });
 
     const { db } = await connectToDatabase();
-    const collection = db.collection("po");
+    const collection = db.collection("d-tracking");
 
     // 🔹 Only set isActive to false
     const result = await collection.updateOne(

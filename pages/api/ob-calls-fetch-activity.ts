@@ -18,13 +18,6 @@ export default async function handler(
     const {
       referenceid,
       type_activity,
-      tsm,
-      manager,
-      project_name,
-      status,
-      start_date,
-      end_date,
-      date_created,
     } = req.query;
 
     // Initialize the query to select all records, ordered by date_created descending
