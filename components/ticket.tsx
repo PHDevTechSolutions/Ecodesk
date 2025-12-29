@@ -30,6 +30,7 @@ interface Company {
     contact_person: string;
     address: string;
     status: string;
+    referenceid: string;
 }
 
 interface MergedActivity extends Ticket {
@@ -87,6 +88,12 @@ interface TicketProps {
     setDateCreatedFilterRangeAction: React.Dispatch<
         React.SetStateAction<DateRange | undefined>
     >;
+}
+
+interface Agent {
+    ReferenceID: string;
+    Firstname: string;
+    Lastname: string;
 }
 
 export const Ticket: React.FC<TicketProps> = ({
@@ -153,6 +160,27 @@ export const Ticket: React.FC<TicketProps> = ({
 
     const [exporting, setExporting] = useState(false);
     const [progress, setProgress] = useState(0);
+
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [agentsLoading, setAgentsLoading] = useState(false);
+
+    useEffect(() => {
+        async function fetchAgents() {
+            setAgentsLoading(true);
+            try {
+                const res = await fetch("/api/fetch-agent");
+                if (!res.ok) throw new Error("Failed to fetch agents");
+                const data = await res.json();
+                setAgents(data);
+            } catch (err) {
+                console.error(err);
+                setAgents([]);
+            } finally {
+                setAgentsLoading(false);
+            }
+        }
+        fetchAgents();
+    }, []);
 
     useEffect(() => {
         if (!exporting) {
@@ -753,7 +781,6 @@ export const Ticket: React.FC<TicketProps> = ({
             setExporting(false);
         }
     }
-
     return (
         <div className="flex flex-col md:flex-row gap-4">
             {/* LEFT SIDE — COMPANIES */}
@@ -766,7 +793,6 @@ export const Ticket: React.FC<TicketProps> = ({
                             referenceid={referenceid}
                             onCreated={fetchCompanies} // pass the fetch function here
                         />
-
                     </div>
                 </CardHeader>
 
@@ -787,57 +813,65 @@ export const Ticket: React.FC<TicketProps> = ({
                             type="multiple"
                             className="overflow-auto space-y-2 p-2 max-h-[700px]"
                         >
-                            {displayedCompanies.map((c) => (
-                                <AccordionItem
-                                    key={c.account_reference_number}
-                                    value={c.account_reference_number} //may kaparehas kasi bro
-                                >
-                                    <div className="flex items-center justify-between text-xs font-semibold gap-2 px-4 py-2">
-                                        <AccordionTrigger className="text-xs font-semibold flex-1 text-left">
-                                            <span
-                                                className="flex-1 text-left break-words whitespace-normal"
-                                                style={{ minWidth: 0 }}
+                            {displayedCompanies.map((c) => {
+                                // Find the agent for this company (adjust if needed)
+                                const agentDetails = agents.find((a) => a.ReferenceID === c.referenceid);
+                                const fullName = agentDetails
+                                    ? `${agentDetails.Firstname} ${agentDetails.Lastname}`
+                                    : "(Unknown Agent)";
+
+                                return (
+                                    <AccordionItem
+                                        key={c.account_reference_number}
+                                        value={c.account_reference_number} // may kaparehas kasi bro
+                                    >
+                                        <div className="flex items-center justify-between text-xs font-semibold gap-2 px-4 py-2">
+                                            <AccordionTrigger className="text-xs font-semibold flex-1 text-left">
+                                                <span
+                                                    className="flex-1 text-left break-words whitespace-normal"
+                                                    style={{ minWidth: 0 }}
+                                                >
+                                                    {c.company_name}
+                                                </span>
+                                            </AccordionTrigger>
+
+                                            <Button
+                                                variant="outline"
+                                                disabled={addingAccount === c.account_reference_number}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAddActivity(c);
+                                                }}
+                                                className="text-xs px-3 py-1"
                                             >
-                                                {c.company_name}
-                                            </span>
-                                        </AccordionTrigger>
+                                                {addingAccount === c.account_reference_number ? "Adding..." : "Add"}
+                                            </Button>
+                                        </div>
 
-                                        <Button
-                                            variant="outline"
-                                            disabled={addingAccount === c.account_reference_number}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAddActivity(c);
-                                            }}
-                                            className="text-xs px-3 py-1"
-                                        >
-                                            {addingAccount === c.account_reference_number
-                                                ? "Adding..."
-                                                : "Add"}
-                                        </Button>
-                                    </div>
-
-                                    <AccordionContent className="text-xs px-4 pb-2 pt-0">
-                                        <p>
-                                            <strong>Contact Number:</strong> {c.contact_number || "-"}
-                                        </p>
-                                        <p>
-                                            <strong>Email Address:</strong> {c.email_address || "-"}
-                                        </p>
-                                        <p className="capitalize">
-                                            <strong>Contact Person:</strong> {c.contact_person || "-"}
-                                        </p>
-                                        <p>
-                                            <strong>Type Client:</strong> {c.type_client || "-"}
-                                        </p>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
+                                        <AccordionContent className="text-xs px-4 pb-2 pt-0">
+                                            <p>
+                                                <strong>Contact Number:</strong> {c.contact_number || "-"}
+                                            </p>
+                                            <p>
+                                                <strong>Email Address:</strong> {c.email_address || "-"}
+                                            </p>
+                                            <p className="capitalize">
+                                                <strong>Contact Person:</strong> {c.contact_person || "-"}
+                                            </p>
+                                            <p className="mb-2">
+                                                <strong>Type Client:</strong> {c.type_client || "-"}
+                                            </p>
+                                            <p className="uppercase">
+                                                <strong>Owner:</strong> {fullName}
+                                            </p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                );
+                            })}
                         </Accordion>
                     )}
                 </CardContent>
             </Card>
-
 
             {/* RIGHT SIDE — ACTIVITIES */}
             <Card className="w-full md:w-2/3 p-4 rounded-xl flex flex-col">
@@ -1136,8 +1170,6 @@ export const Ticket: React.FC<TicketProps> = ({
                     </Item>
                 </div>
             )}
-
         </div>
-
     );
 };
