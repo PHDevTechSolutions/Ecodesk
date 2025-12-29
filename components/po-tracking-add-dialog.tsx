@@ -292,20 +292,17 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
     />
   </SelectTrigger>
 
-  <SelectContent>
-    {companies.map((company) => {
-      if (!company.account_reference_number) return null;
+<SelectContent>
+  {companies.map((company, idx) => (
+    <SelectItem
+      key={company.account_reference_number ?? company.company_name ?? idx}
+      value={company.company_name}
+    >
+      {company.company_name}
+    </SelectItem>
+  ))}
+</SelectContent>
 
-      return (
-        <SelectItem
-          key={company.account_reference_number} // key can still be reference number
-          value={company.company_name} // <-- use company_name here
-        >
-          {company.company_name}
-        </SelectItem>
-      );
-    })}
-  </SelectContent>
 </Select>
 
               {errorCompanies && (

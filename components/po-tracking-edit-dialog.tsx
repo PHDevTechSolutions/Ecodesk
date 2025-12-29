@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
@@ -51,6 +51,7 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
     delivery_pickup_date: "",
     source: "",
     status: "",
+    company_ref: "",
   });
 
   const [contactNumbers, setContactNumbers] = useState<string[]>([""]);
@@ -64,7 +65,6 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
     return isValid(parsed) ? format(parsed, "yyyy-MM-dd'T'HH:mm") : "";
   };
 
-  // Fetch all companies once
   const fetchCompanies = useCallback(async () => {
     setLoadingCompanies(true);
     setErrorCompanies(null);
@@ -84,38 +84,41 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
     if (isOpen) fetchCompanies();
   }, [isOpen, fetchCompanies]);
 
-  // Populate form with record data
-useEffect(() => {
-  if (record) {
-    setForm({
-      referenceid: record.referenceid || "",
-      company_name: record.company_name || "",
-      po_number: record.po_number || "",
-      amount: record.amount || "",
-      so_number: record.so_number || "",
-      so_date: parseDate(record.so_date),
-      sales_agent: record.sales_agent || "",
-      payment_terms: record.payment_terms || "",
-      payment_date: parseDate(record.payment_date),
-      delivery_pickup_date: parseDate(record.delivery_pickup_date),
-      source: record.source || "",
-      status: record.status || "",
-      company_ref: record.account_reference_number || "", // NEW: keep account reference
-    });
+  // Populate form with record and select correct company
+  useEffect(() => {
+    if (record && companies.length) {
+      const selectedCompany = companies.find(c => String(c.account_reference_number) === String(record.account_reference_number));
+      setForm({
+        referenceid: record.referenceid || "",
+        po_number: record.po_number || "",
+        amount: record.amount || "",
+        so_number: record.so_number || "",
+        so_date: parseDate(record.so_date),
+        sales_agent: record.sales_agent || "",
+        payment_terms: record.payment_terms || "",
+        payment_date: parseDate(record.payment_date),
+        delivery_pickup_date: parseDate(record.delivery_pickup_date),
+        source: record.source || "",
+        status: record.status || "",
+        company_name: selectedCompany?.company_name || record.company_name || "",
+        company_ref_number: selectedCompany?.account_reference_number || record.account_reference_number || "",
+        company_ref: selectedCompany?.account_reference_number || record.account_reference_number || "",
+      });
 
-    setContactNumbers(
-      record.contact_number?.split(/\s*\/\s*/).filter(Boolean) || [""]
-    );
-  }
-}, [record]);
+      setContactNumbers(
+        record.contact_number?.split(/\s*\/\s*/).filter(Boolean) || [""]
+      );
+    }
+  }, [record, companies]);
 
   const handleChange = (key: string, value: any) => {
     if (key === "company_ref_number") {
-      const selectedCompany = companies.find(c => c.account_reference_number === value);
+      const selectedCompany = companies.find(c => String(c.account_reference_number) === String(value));
       setForm((prev: any) => ({
         ...prev,
         company_ref_number: value,
         company_name: selectedCompany?.company_name || "",
+        company_ref: selectedCompany?.account_reference_number || "",
       }));
 
       if (selectedCompany) {
@@ -147,32 +150,32 @@ useEffect(() => {
     setContactNumbers(updated);
   };
 
-const handleSave = async () => {
-  try {
-    const payload = {
-      ...record, // merge original record to keep untouched fields
-      ...form,   // override with changed fields
-      contact_number: contactNumbers.filter(Boolean).join(" / "),
-      account_reference_number: form.company_ref, // use selected reference
-      _id: record._id,
-    };
+  const handleSave = async () => {
+    try {
+      const payload = {
+        ...record,
+        ...form,
+        contact_number: contactNumbers.filter(Boolean).join(" / "),
+        account_reference_number: form.company_ref,
+        _id: record._id,
+      };
 
-    const res = await fetch("/api/po-edit-record", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      const res = await fetch("/api/po-edit-record", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to update PO record");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update PO record");
 
-    toast.success("PO record updated successfully");
-    onSave(data.updatedRecord);
-    onClose();
-  } catch (err: any) {
-    toast.error(err.message);
-  }
-};
+      toast.success("PO record updated successfully");
+      onSave(data.updatedRecord);
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -189,20 +192,27 @@ const handleSave = async () => {
             handleSave();
           }}
         >
+          {/* Company Dropdown */}
           <Field>
             <FieldLabel>Company</FieldLabel>
             <FieldContent>
               <Select
                 value={form.company_ref_number}
-                onValueChange={(value) => handleChange("company_ref_number", value)}
+                onValueChange={v => handleChange("company_ref_number", v)}
                 disabled={loadingCompanies}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={loadingCompanies ? "Loading..." : "Select company"} />
+                  <SelectValue>
+                    {companies.find(c => String(c.account_reference_number) === String(form.company_ref_number))?.company_name
+                      || (loadingCompanies ? "Loading..." : "Select company")}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {companies.map(c => (
-                    <SelectItem key={c.account_reference_number} value={c.account_reference_number}>
+                  {companies.map((c, idx) => (
+                    <SelectItem
+                      key={c.account_reference_number ?? c.company_name ?? idx}
+                      value={c.account_reference_number}
+                    >
                       {c.company_name}
                     </SelectItem>
                   ))}
@@ -212,6 +222,7 @@ const handleSave = async () => {
             </FieldContent>
           </Field>
 
+          {/* Contact Numbers */}
           <Field>
             <FieldLabel>Contact Number</FieldLabel>
             <FieldContent>
@@ -224,9 +235,7 @@ const handleSave = async () => {
                       onChange={e => handleContactChange(idx, e.target.value)}
                       className="flex-grow"
                     />
-                    <Button variant="outline" type="button" onClick={() => removeContactField(idx)}>
-                      −
-                    </Button>
+                    <Button variant="outline" type="button" onClick={() => removeContactField(idx)}>−</Button>
                   </div>
                 ))}
                 <Button variant="secondary" type="button" onClick={addContactField}>
@@ -236,7 +245,7 @@ const handleSave = async () => {
             </FieldContent>
           </Field>
 
-          {/* Original inputs unchanged */}
+          {/* Remaining fields */}
           <Field>
             <FieldLabel>PO Number</FieldLabel>
             <FieldContent>
@@ -270,7 +279,7 @@ const handleSave = async () => {
             <FieldContent>
               <Select value={form.sales_agent} onValueChange={v => handleChange("sales_agent", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Agent" />
+                  <SelectValue>{form.sales_agent || "Select Agent"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {SALES_AGENTS.map(agent => (
@@ -314,7 +323,7 @@ const handleSave = async () => {
             <FieldContent>
               <Select value={form.status} onValueChange={v => handleChange("status", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Status" />
+                  <SelectValue>{form.status || "Select Status"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {["PO Received"].map(s => (

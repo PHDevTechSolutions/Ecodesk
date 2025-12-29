@@ -296,7 +296,7 @@ const recordsWithCompanyName = useMemo(() => {
       ];
     });
 
-    const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const totalAmount = filteredRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     rows.push(["", "", "", "", totalAmount.toString(), "", "", "", "", "", "", "", "", "", "", "Total"]);
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].map((e) => e.join(",")).join("\n");
@@ -412,9 +412,9 @@ const recordsWithCompanyName = useMemo(() => {
                     );
                   })}
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right font-bold">Total:</TableCell>
+                    <TableCell colSpan={5} className="text-right font-bold">Total (All Pages):</TableCell>
                     <TableCell className="font-bold">
-                      {paginatedRecords.reduce((sum, r) => sum + (Number(r.amount?.toString().replace(/,/g, "")) || 0), 0).toLocaleString()}
+                      {filteredRecords.reduce((sum, r) => sum + (Number(r.amount?.toString().replace(/,/g, "")) || 0), 0).toLocaleString()}
                     </TableCell>
                     <TableCell colSpan={10}></TableCell>
                   </TableRow>
