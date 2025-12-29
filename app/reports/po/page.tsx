@@ -165,12 +165,15 @@ function POContent() {
     return map;
   }, [companies]);
 
-  const recordsWithCompanyName = useMemo(() => {
-    return records.map((r) => {
-      const acctRef = r.account_reference_number || r.company_ref_number || r.company_name;
-      return { ...r, company_name: companyMap[acctRef] || "Unknown Company" };
-    });
-  }, [records, companyMap]);
+const recordsWithCompanyName = useMemo(() => {
+  return records.map((r) => {
+    const acctRef = r.account_reference_number || r.company_ref_number;
+    return { 
+      ...r, 
+      company_name: companyMap[acctRef] || r.company_name || "Unknown Company" 
+    };
+  });
+}, [records, companyMap]);
 
   // Fetch records
   useEffect(() => {

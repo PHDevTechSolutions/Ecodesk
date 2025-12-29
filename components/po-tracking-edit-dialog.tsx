@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
@@ -14,6 +14,12 @@ interface EditPOProps {
   onClose: () => void;
   record: any;
   onSave: (updatedRecord: any) => void;
+}
+
+interface Company {
+  account_reference_number: string;
+  company_name: string;
+  contact_number: string[] | string;
 }
 
 const SALES_AGENTS = [
@@ -33,6 +39,7 @@ const SALES_AGENTS = [
 export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave }) => {
   const [form, setForm] = useState<any>({
     referenceid: "",
+    company_ref_number: "",
     company_name: "",
     po_number: "",
     amount: "",
@@ -47,39 +54,83 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
   });
 
   const [contactNumbers, setContactNumbers] = useState<string[]>([""]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
 
-  // Safe date parser
   const parseDate = (dateStr: string) => {
     if (!dateStr) return "";
     const parsed = parseISO(dateStr);
     return isValid(parsed) ? format(parsed, "yyyy-MM-dd'T'HH:mm") : "";
   };
 
-  useEffect(() => {
-    if (record) {
-      const numbers = record.contact_number?.split(" / ").filter(Boolean) || [""];
-
-      setForm({
-        referenceid: record.referenceid || "",
-        company_name: record.company_name || "",
-        po_number: record.po_number || "",
-        amount: record.amount || "",
-        so_number: record.so_number || "",
-        so_date: parseDate(record.so_date),
-        sales_agent: record.sales_agent || "",
-        payment_terms: record.payment_terms || "",
-        payment_date: parseDate(record.payment_date),
-        delivery_pickup_date: parseDate(record.delivery_pickup_date),
-        source: record.source || "",
-        status: record.status || "",
-      });
-
-      setContactNumbers(numbers);
+  // Fetch all companies once
+  const fetchCompanies = useCallback(async () => {
+    setLoadingCompanies(true);
+    setErrorCompanies(null);
+    try {
+      const res = await fetch("/api/com-fetch-po-company", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch companies");
+      const data = await res.json();
+      setCompanies(data.data || []);
+    } catch (err: any) {
+      setErrorCompanies(err.message || "Error fetching companies");
+    } finally {
+      setLoadingCompanies(false);
     }
-  }, [record]);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) fetchCompanies();
+  }, [isOpen, fetchCompanies]);
+
+  // Populate form with record data
+useEffect(() => {
+  if (record) {
+    setForm({
+      referenceid: record.referenceid || "",
+      company_name: record.company_name || "",
+      po_number: record.po_number || "",
+      amount: record.amount || "",
+      so_number: record.so_number || "",
+      so_date: parseDate(record.so_date),
+      sales_agent: record.sales_agent || "",
+      payment_terms: record.payment_terms || "",
+      payment_date: parseDate(record.payment_date),
+      delivery_pickup_date: parseDate(record.delivery_pickup_date),
+      source: record.source || "",
+      status: record.status || "",
+      company_ref: record.account_reference_number || "", // NEW: keep account reference
+    });
+
+    setContactNumbers(
+      record.contact_number?.split(/\s*\/\s*/).filter(Boolean) || [""]
+    );
+  }
+}, [record]);
 
   const handleChange = (key: string, value: any) => {
-    setForm((prev: any) => ({ ...prev, [key]: value }));
+    if (key === "company_ref_number") {
+      const selectedCompany = companies.find(c => c.account_reference_number === value);
+      setForm((prev: any) => ({
+        ...prev,
+        company_ref_number: value,
+        company_name: selectedCompany?.company_name || "",
+      }));
+
+      if (selectedCompany) {
+        const numbers = Array.isArray(selectedCompany.contact_number)
+          ? selectedCompany.contact_number
+          : typeof selectedCompany.contact_number === "string"
+          ? selectedCompany.contact_number.split(/\s*\/\s*/).filter(Boolean)
+          : [""];
+        setContactNumbers(numbers);
+      } else {
+        setContactNumbers([""]);
+      }
+    } else {
+      setForm((prev: any) => ({ ...prev, [key]: value }));
+    }
   };
 
   const handleContactChange = (index: number, value: string) => {
@@ -96,30 +147,32 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
     setContactNumbers(updated);
   };
 
-  const handleSave = async () => {
-    try {
-      const payload = {
-        ...form,
-        contact_number: contactNumbers.filter(Boolean).join(" / "),
-        id: record._id,
-      };
+const handleSave = async () => {
+  try {
+    const payload = {
+      ...record, // merge original record to keep untouched fields
+      ...form,   // override with changed fields
+      contact_number: contactNumbers.filter(Boolean).join(" / "),
+      account_reference_number: form.company_ref, // use selected reference
+      _id: record._id,
+    };
 
-      const res = await fetch("/api/po-edit-record", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    const res = await fetch("/api/po-edit-record", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update PO record");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to update PO record");
 
-      toast.success("PO record updated successfully");
-      onSave(data.updatedRecord);
-      onClose();
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  };
+    toast.success("PO record updated successfully");
+    onSave(data.updatedRecord);
+    onClose();
+  } catch (err: any) {
+    toast.error(err.message);
+  }
+};
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -139,11 +192,23 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
           <Field>
             <FieldLabel>Company</FieldLabel>
             <FieldContent>
-              <Input
-                name="company_name"
-                value={form.company_name}
-                onChange={e => handleChange("company_name", e.target.value)}
-              />
+              <Select
+                value={form.company_ref_number}
+                onValueChange={(value) => handleChange("company_ref_number", value)}
+                disabled={loadingCompanies}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingCompanies ? "Loading..." : "Select company"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map(c => (
+                    <SelectItem key={c.account_reference_number} value={c.account_reference_number}>
+                      {c.company_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errorCompanies && <p className="text-red-500 text-sm mt-1">{errorCompanies}</p>}
             </FieldContent>
           </Field>
 
@@ -171,49 +236,32 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
             </FieldContent>
           </Field>
 
+          {/* Original inputs unchanged */}
           <Field>
             <FieldLabel>PO Number</FieldLabel>
             <FieldContent>
-              <Input
-                name="po_number"
-                value={form.po_number}
-                onChange={e => handleChange("po_number", e.target.value)}
-              />
+              <Input name="po_number" value={form.po_number} onChange={e => handleChange("po_number", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Amount</FieldLabel>
             <FieldContent>
-              <Input
-                name="amount"
-                type="number"
-                value={form.amount}
-                onChange={e => handleChange("amount", e.target.value)}
-              />
+              <Input name="amount" type="number" value={form.amount} onChange={e => handleChange("amount", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>SO Number</FieldLabel>
             <FieldContent>
-              <Input
-                name="so_number"
-                value={form.so_number}
-                onChange={e => handleChange("so_number", e.target.value)}
-              />
+              <Input name="so_number" value={form.so_number} onChange={e => handleChange("so_number", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>SO Date</FieldLabel>
             <FieldContent>
-              <Input
-                type="datetime-local"
-                name="so_date"
-                value={form.so_date}
-                onChange={e => handleChange("so_date", e.target.value)}
-              />
+              <Input type="datetime-local" name="so_date" value={form.so_date} onChange={e => handleChange("so_date", e.target.value)} />
             </FieldContent>
           </Field>
 
@@ -236,46 +284,28 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
           <Field>
             <FieldLabel>Payment Terms</FieldLabel>
             <FieldContent>
-              <Input
-                name="payment_terms"
-                value={form.payment_terms}
-                onChange={e => handleChange("payment_terms", e.target.value)}
-              />
+              <Input name="payment_terms" value={form.payment_terms} onChange={e => handleChange("payment_terms", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Payment Date</FieldLabel>
             <FieldContent>
-              <Input
-                type="datetime-local"
-                name="payment_date"
-                value={form.payment_date}
-                onChange={e => handleChange("payment_date", e.target.value)}
-              />
+              <Input type="datetime-local" name="payment_date" value={form.payment_date} onChange={e => handleChange("payment_date", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Delivery/Pickup Date</FieldLabel>
             <FieldContent>
-              <Input
-                type="datetime-local"
-                name="delivery_pickup_date"
-                value={form.delivery_pickup_date}
-                onChange={e => handleChange("delivery_pickup_date", e.target.value)}
-              />
+              <Input type="datetime-local" name="delivery_pickup_date" value={form.delivery_pickup_date} onChange={e => handleChange("delivery_pickup_date", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Source</FieldLabel>
             <FieldContent>
-              <Input
-                name="source"
-                value={form.source}
-                onChange={e => handleChange("source", e.target.value)}
-              />
+              <Input name="source" value={form.source} onChange={e => handleChange("source", e.target.value)} />
             </FieldContent>
           </Field>
 
@@ -296,9 +326,7 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
           </Field>
 
           <div className="pt-4 flex gap-2 justify-end">
-            <Button variant="outline" onClick={onClose} type="button">
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={onClose} type="button">Cancel</Button>
             <Button type="submit">Save Changes</Button>
           </div>
         </form>
