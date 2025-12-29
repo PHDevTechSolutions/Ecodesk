@@ -6,8 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { UserProvider } from "@/contexts/UserContext";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Reminders } from "@/components/reminders";
 import { TicketReceived } from "@/components/popup-ticket-received";
+import { TicketHistory } from "@/components/popup-ticket-outbound";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,9 +40,9 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <UserProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <Reminders />
             <Suspense fallback={null}>
               <TicketReceived />
+              <TicketHistory />
             </Suspense>
             {children}
           </ThemeProvider>
