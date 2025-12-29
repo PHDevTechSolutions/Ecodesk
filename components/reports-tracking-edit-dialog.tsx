@@ -24,7 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { format } from "date-fns";
 
 interface EditRecordModalProps {
   isOpen: boolean;
@@ -69,10 +68,10 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
         nature_of_concern: record.nature_of_concern || "",
         remarks: record.remarks || "",
         endorsed_date: record.endorsed_date
-          ? format(new Date(record.endorsed_date), "yyyy-MM-dd'T'HH:mm")
+          ? new Date(record.endorsed_date).toISOString().slice(0, 16)
           : "",
         closed_date: record.closed_date
-          ? format(new Date(record.closed_date), "yyyy-MM-dd'T'HH:mm")
+          ? new Date(record.closed_date).toISOString().slice(0, 16)
           : "",
         contactNumbers: record.contact_number
           ? record.contact_number.split(" / ")
@@ -108,19 +107,20 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
 
   const handleSave = async () => {
     try {
+      // Prepare payload with _id and ISO dates
       const payload = {
+        _id: record._id,
         ...form,
         contact_number: form.contactNumbers
           .map((n: string) => n.trim())
           .filter(Boolean)
           .join(" / "),
         endorsed_date: form.endorsed_date
-          ? format(new Date(form.endorsed_date), "MM/dd/yyyy hh:mm aa")
+          ? new Date(form.endorsed_date).toISOString()
           : "",
         closed_date: form.closed_date
-          ? format(new Date(form.closed_date), "MM/dd/yyyy hh:mm aa")
+          ? new Date(form.closed_date).toISOString()
           : "",
-        id: record._id,
       };
 
       const res = await fetch("/api/d-tracking-edit-record", {
@@ -130,10 +130,15 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
       });
 
       const data = await res.json();
+
       if (!res.ok) throw new Error(data.error || "Failed to update record");
 
       toast.success("Record updated successfully");
-      onSave(data.updatedRecord);
+
+      // Since your API returns only {success: true}, 
+      // merge updated fields to send back to parent
+      onSave({ ...record, ...payload });
+
       onClose();
     } catch (err: any) {
       toast.error(err.message);
@@ -142,15 +147,10 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent
-        side="right"
-        className="overflow-auto p-6 space-y-4"
-      >
+      <SheetContent side="right" className="overflow-auto p-6 space-y-4">
         <SheetHeader>
           <SheetTitle>Edit D-Tracking Record</SheetTitle>
-          <SheetDescription>
-            Update the details of the record below.
-          </SheetDescription>
+          <SheetDescription>Update the details of the record below.</SheetDescription>
         </SheetHeader>
 
         <form
@@ -160,6 +160,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             handleSave();
           }}
         >
+          {/* Company */}
           <Field>
             <FieldLabel htmlFor="company_name">Company</FieldLabel>
             <FieldContent>
@@ -172,6 +173,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Customer Name */}
           <Field>
             <FieldLabel htmlFor="customer_name">Customer Name</FieldLabel>
             <FieldContent>
@@ -184,6 +186,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Contact Numbers */}
           <Field>
             <FieldLabel>Contact Number</FieldLabel>
             <FieldContent>
@@ -208,17 +211,14 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                     </Button>
                   </div>
                 ))}
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={addContactField}
-                >
+                <Button variant="secondary" type="button" onClick={addContactField}>
                   + Add another number
                 </Button>
               </div>
             </FieldContent>
           </Field>
 
+          {/* Ticket Type */}
           <Field>
             <FieldLabel htmlFor="ticket_type">Ticket Type</FieldLabel>
             <FieldContent>
@@ -245,10 +245,10 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   ))}
                 </SelectContent>
               </Select>
-
             </FieldContent>
           </Field>
 
+          {/* Ticket Concern */}
           <Field>
             <FieldLabel htmlFor="ticket_concern">Ticket Concern</FieldLabel>
             <FieldContent>
@@ -290,6 +290,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Department */}
           <Field>
             <FieldLabel htmlFor="department">Department</FieldLabel>
             <FieldContent>
@@ -317,10 +318,10 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   ))}
                 </SelectContent>
               </Select>
-
             </FieldContent>
           </Field>
 
+          {/* Sales Agent */}
           <Field>
             <FieldLabel htmlFor="sales_agent">Sales Agent</FieldLabel>
             <FieldContent>
@@ -332,6 +333,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   <SelectValue placeholder="Select Agent" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* List of agents */}
                   {[
                     "Airish Echanes",
                     "Alvin Estor",
@@ -387,6 +389,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* TSM */}
           <Field>
             <FieldLabel htmlFor="tsm">TSM</FieldLabel>
             <FieldContent>
@@ -424,6 +427,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Status */}
           <Field>
             <FieldLabel htmlFor="status">Status</FieldLabel>
             <FieldContent>
@@ -442,10 +446,10 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                   ))}
                 </SelectContent>
               </Select>
-
             </FieldContent>
           </Field>
 
+          {/* Nature of Concern */}
           <Field>
             <FieldLabel htmlFor="nature_of_concern">Nature of Concern</FieldLabel>
             <FieldContent>
@@ -458,6 +462,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Remarks */}
           <Field>
             <FieldLabel htmlFor="remarks">Remarks</FieldLabel>
             <FieldContent>
@@ -470,6 +475,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Endorsed Date */}
           <Field>
             <FieldLabel htmlFor="endorsed_date">Endorsed Date</FieldLabel>
             <FieldContent>
@@ -483,6 +489,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Closed Date */}
           <Field>
             <FieldLabel htmlFor="closed_date">Closed Date</FieldLabel>
             <FieldContent>
@@ -496,6 +503,7 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             </FieldContent>
           </Field>
 
+          {/* Buttons */}
           <div className="pt-4 flex gap-2 justify-end">
             <Button variant="outline" onClick={onClose} type="button">
               Cancel

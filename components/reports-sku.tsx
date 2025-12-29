@@ -571,12 +571,12 @@ export const SKU: React.FC<TicketProps> = ({
     return (
         <div className="flex flex-col md:flex-row gap-4">
             {/* RIGHT SIDE — ACTIVITIES */}
-            <Card className="w-full p-4 rounded-xl flex flex-col">
-                <div className="mb-2 text-xs font-bold">
+            <Card className="w-full flex flex-col border-none shadow-none">
+                <div className="text-xs font-bold">
                     Total Sku Listing's: {filteredActivities.length}
                 </div>
 
-                <div className="flex mb-3 space-x-2 items-center">
+                <div className="flex space-x-2 items-center">
                     <input
                         type="search"
                         placeholder="Search activities by company, status, reference number..."
@@ -627,7 +627,7 @@ export const SKU: React.FC<TicketProps> = ({
                 </div>
 
                 {/* ACTIVITIES LIST */}
-                <div className="max-h-[600px] overflow-auto space-y-4 custom-scrollbar flex-grow">
+                <div className="max-h-[600px] overflow-auto custom-scrollbar flex-grow">
                     <Accordion type="single" collapsible className="w-full">
                         {paginatedActivities.map((item, index) => {
                             let badgeColor: "default" | "secondary" | "outline" = "default";

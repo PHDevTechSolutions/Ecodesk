@@ -451,7 +451,6 @@ export const DCT: React.FC<TicketProps> = ({
         }, 500);
     };
 
-
     return (
         <>
             {isLoading ? (

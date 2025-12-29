@@ -862,7 +862,7 @@ export const Ticket: React.FC<TicketProps> = ({
                                                 <strong>Type Client:</strong> {c.type_client || "-"}
                                             </p>
                                             <p className="uppercase">
-                                                <strong>Owner:</strong> {fullName}
+                                                <strong>Current Handler:</strong> {fullName}
                                             </p>
                                         </AccordionContent>
                                     </AccordionItem>

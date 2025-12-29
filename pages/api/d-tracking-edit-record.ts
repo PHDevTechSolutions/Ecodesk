@@ -1,21 +1,16 @@
-// pages/api/d-tracking-edit-record.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { MongoClient, ObjectId } from "mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB;
 
-/* 🔒 Runtime env checks */
+// Runtime check for env vars
 if (!MONGODB_URI) {
-  throw new Error(
-    "Please define the MONGODB_URI environment variable inside .env.local"
-  );
+  throw new Error("Please define the MONGODB_URI environment variable inside .env.local");
 }
 
 if (!MONGODB_DB) {
-  throw new Error(
-    "Please define the MONGODB_DB environment variable inside .env.local"
-  );
+  throw new Error("Please define the MONGODB_DB environment variable inside .env.local");
 }
 
 const mongoUri: string = MONGODB_URI;
@@ -29,9 +24,9 @@ async function connectToDatabase() {
     return { client: cachedClient, db: cachedDb };
   }
 
-  const client = new MongoClient(mongoUri);
+  const client = new MongoClient(mongoUri!);
   await client.connect();
-  const db = client.db(mongoDb);
+  const db = client.db(mongoDb!);
 
   cachedClient = client;
   cachedDb = db;
@@ -39,81 +34,52 @@ async function connectToDatabase() {
   return { client, db };
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   try {
-    // Accept either 'id' or '_id'
-    const {
-      id,
-      _id: _idFromBody,
-      company_name,
-      customer_name,
-      contact_number,
-      ticket_type,
-      ticket_concern,
-      department,
-      sales_agent,
-      tsm,
-      status,
-      nature_of_concern,
-      remarks,
-      endorsed_date,
-      closed_date,
-    } = req.body;
+    const body = req.body;
 
-    // Use whichever is provided
-    const recordId = id || _idFromBody;
+    if (!body._id) {
+      return res.status(400).json({ error: "Missing record _id" });
+    }
 
-    /* 🔒 Basic validation */
-    if (!recordId) {
-      return res.status(400).json({ error: "Record ID (_id or id) is required" });
+    if (!ObjectId.isValid(body._id)) {
+      return res.status(400).json({ error: "Invalid _id format" });
     }
 
     const { db } = await connectToDatabase();
     const collection = db.collection("d-tracking");
 
-    /* 📌 Build update document */
-    const updateDoc: any = {
-      company_name,
-      customer_name,
-      contact_number,
-      ticket_type,
-      ticket_concern,
-      department,
-      sales_agent,
-      tsm,
-      status,
-      nature_of_concern,
-      remarks,
-      endorsed_date, // date string
-      closed_date,   // date string
-      date_created: new Date().toISOString(), // only date_created
-    };
+    const filter = { _id: new ObjectId(body._id) };
 
-    const result = await collection.updateOne(
-      { _id: new ObjectId(recordId) },
-      { $set: updateDoc }
-    );
+    // Get existing document to preserve date_created
+    const existingDoc = await collection.findOne(filter);
+    if (!existingDoc) {
+      return res.status(404).json({ error: "Record not found" });
+    }
+
+    // Prepare update data:
+    // - Remove _id so it won't be overwritten
+    // - Preserve date_created from existing doc
+    // - Add date_updated timestamp
+    const updateData = { ...body };
+    delete updateData._id;
+
+    updateData.date_created = existingDoc.date_created || new Date().toISOString();
+    updateData.date_updated = new Date().toISOString();
+
+    const result = await collection.updateOne(filter, { $set: updateData });
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ error: "Record not found" });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "D-Tracking record updated successfully",
-      updatedRecord: { _id: recordId, ...updateDoc },
-    });
+    return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error("MongoDB update error:", error);
-    return res.status(500).json({
-      error: error.message || "Failed to update D-Tracking record",
-    });
+    return res.status(500).json({ error: error.message || "Failed to update record" });
   }
 }

@@ -3,8 +3,7 @@
 
 import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { FaFilter } from "react-icons/fa";
-
+import { Filter } from "lucide-react";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { SidebarLeft } from "@/components/sidebar-left";
@@ -13,7 +12,7 @@ import { POTrackingAddDialog } from "@/components/po-tracking-add-dialog";
 import { PODeleteModal } from "@/components/po-delete-dialog";
 import { EditPO as POTrackingEditDialog } from "@/components/po-tracking-edit-dialog";
 import { POFilterDialog } from "@/components/po-filter-dialog";
-
+import { type DateRange } from "react-day-picker";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -165,15 +164,15 @@ function POContent() {
     return map;
   }, [companies]);
 
-const recordsWithCompanyName = useMemo(() => {
-  return records.map((r) => {
-    const acctRef = r.account_reference_number || r.company_ref_number;
-    return { 
-      ...r, 
-      company_name: companyMap[acctRef] || r.company_name || "Unknown Company" 
-    };
-  });
-}, [records, companyMap]);
+  const recordsWithCompanyName = useMemo(() => {
+    return records.map((r) => {
+      const acctRef = r.account_reference_number || r.company_ref_number;
+      return {
+        ...r,
+        company_name: companyMap[acctRef] || r.company_name || "Unknown Company"
+      };
+    });
+  }, [records, companyMap]);
 
   // Fetch records
   useEffect(() => {
@@ -207,6 +206,27 @@ const recordsWithCompanyName = useMemo(() => {
     [recordsWithCompanyName]
   );
 
+  const isDateInRange = (dateStr: string, range: DateRange | undefined) => {
+    if (!range) return true;
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    const { from, to } = range;
+
+    const fromDate = from
+      ? new Date(from.getFullYear(), from.getMonth(), from.getDate())
+      : null;
+    const toDate = to
+      ? new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999)
+      : null;
+
+    if (fromDate && date < fromDate) return false;
+    if (toDate && date > toDate) return false;
+
+    return true;
+  };
+
   // Filtered records including search, filters, and sidebar date range
   const filteredRecords = useMemo(() => {
     return recordsWithCompanyName.filter((r) => {
@@ -234,11 +254,9 @@ const recordsWithCompanyName = useMemo(() => {
         (filters.sales_agent === "All" || r.sales_agent === filters.sales_agent) &&
         (filters.csr_agent === "All" || r.csr_agent === filters.csr_agent);
 
-      const matchesDateRange =
-        !dateCreatedFilterRange ||
-        (!r.date_created ? false : new Date(r.date_created) >= dateCreatedFilterRange?.from && new Date(r.date_created) <= dateCreatedFilterRange?.to);
+      if (!isDateInRange(r.date_created, dateCreatedFilterRange)) return false;
 
-      return matchesSearch && matchesFilters && matchesDateRange;
+      return matchesSearch && matchesFilters && dateCreatedFilterRange;
     });
   }, [recordsWithCompanyName, searchTerm, filters, dateCreatedFilterRange]);
 
@@ -252,6 +270,7 @@ const recordsWithCompanyName = useMemo(() => {
 
   const handleDownloadCSV = () => {
     if (!records.length) return;
+
     const headers = [
       "CSR Agent",
       "Company",
@@ -271,11 +290,20 @@ const recordsWithCompanyName = useMemo(() => {
       "Created At",
     ];
 
-    const rows = recordsWithCompanyName.map((r) => {
+    // Filter records by date range before exporting
+    const recordsToExport = recordsWithCompanyName.filter((r) =>
+      isDateInRange(r.date_created, dateCreatedFilterRange)
+    );
+
+    const rows = recordsToExport.map((r) => {
       const soDate = r.so_date ? new Date(r.so_date) : null;
       const paymentDate = r.payment_date ? new Date(r.payment_date) : null;
-      const pendingFromSO = soDate ? Math.floor((today.getTime() - soDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-      const pendingFromPayment = paymentDate ? Math.floor((today.getTime() - paymentDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+      const pendingFromSO = soDate
+        ? Math.floor((today.getTime() - soDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+      const pendingFromPayment = paymentDate
+        ? Math.floor((today.getTime() - paymentDate.getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
       return [
         `${userDetails.Firstname ?? ""} ${userDetails.Lastname ?? ""}`.trim(),
         r.company_name,
@@ -296,10 +324,15 @@ const recordsWithCompanyName = useMemo(() => {
       ];
     });
 
-    const totalAmount = filteredRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    // Calculate total only from filtered records matching date range
+    const totalAmount = recordsToExport.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
     rows.push(["", "", "", "", totalAmount.toString(), "", "", "", "", "", "", "", "", "", "", "Total"]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].map((e) => e.join(",")).join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers, ...rows].map((e) => e.join(",")).join("\n");
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -311,6 +344,18 @@ const recordsWithCompanyName = useMemo(() => {
 
   const handlePrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
   const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? "-" : d.toLocaleString();
+  };
+
+  const formatDateOnly = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
+  };
 
   return (
     <>
@@ -330,8 +375,8 @@ const recordsWithCompanyName = useMemo(() => {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 p-4 overflow-auto">
-          <div className="border rounded p-4 space-y-4">
+        <main className="flex flex-1 flex-col overflow-auto">
+          <div className="p-4 space-y-4">
             <div className="flex justify-between items-center gap-2">
               <Input
                 type="text"
@@ -344,14 +389,9 @@ const recordsWithCompanyName = useMemo(() => {
                 className="w-80"
               />
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setFilterDialogOpen(true)}><FaFilter /> Filter</Button>
-                {(Object.values(filters).some((v) => v !== "All") || dateCreatedFilterRange || searchTerm) && (
-                  <Button variant="destructive" onClick={() => { setFilters({ ...defaultFilters }); setDateCreatedFilterRangeAction(undefined); setSearchTerm(""); }}>
-                    Clear Filters
-                  </Button>
-                )}
-                <Button className="bg-green-500 text-white hover:bg-green-600" onClick={handleDownloadCSV}>Download CSV</Button>
+                <Button variant="outline" onClick={() => setFilterDialogOpen(true)}><Filter /> Filter</Button>
                 <Button onClick={() => setOpenAdd(true)}>Add Record</Button>
+                <Button className="bg-green-500 text-white hover:bg-green-600" onClick={handleDownloadCSV}>Download CSV</Button>
               </div>
             </div>
 
@@ -392,27 +432,27 @@ const recordsWithCompanyName = useMemo(() => {
                           <Button size="sm" variant="outline" onClick={() => { setRecordToEdit(r); setEditModalOpen(true); }}>Edit</Button>
                           <Button size="sm" variant="destructive" onClick={() => { setRecordToDelete(r); setDeleteModalOpen(true); }}>Delete</Button>
                         </TableCell>
-                        <TableCell>{highlightMatch(`${userDetails.Firstname ?? ""} ${userDetails.Lastname ?? ""}`, searchTerm)}</TableCell>
+                        <TableCell className="uppercase">{highlightMatch(`${userDetails.Firstname ?? ""} ${userDetails.Lastname ?? ""}`, searchTerm)}</TableCell>
                         <TableCell>{highlightMatch(r.company_name, searchTerm)}</TableCell>
                         <TableCell>{highlightMatch(r.contact_number ?? "—", searchTerm)}</TableCell>
-                        <TableCell>{highlightMatch(r.po_number ?? "—", searchTerm)}</TableCell>
+                        <TableCell className="uppercase">{highlightMatch(r.po_number ?? "—", searchTerm)}</TableCell>
                         <TableCell>{highlightMatch(r.amount?.toString() ?? "0", searchTerm)}</TableCell>
-                        <TableCell>{highlightMatch(r.so_number ?? "—", searchTerm)}</TableCell>
-                        <TableCell>{highlightMatch(r.so_date ?? "—", searchTerm)}</TableCell>
+                        <TableCell className="uppercase">{highlightMatch(r.so_number ?? "—", searchTerm)}</TableCell>
+                        <TableCell>{formatDateOnly(r.so_date)}</TableCell>
                         <TableCell>{highlightMatch(r.sales_agent ?? "—", searchTerm)}</TableCell>
                         <TableCell>{pendingFromSO}</TableCell>
                         <TableCell>{highlightMatch(r.payment_terms ?? "—", searchTerm)}</TableCell>
-                        <TableCell>{highlightMatch(r.payment_date ?? "—", searchTerm)}</TableCell>
-                        <TableCell>{highlightMatch(r.delivery_pickup_date ?? "—", searchTerm)}</TableCell>
+                        <TableCell>{formatDateOnly(r.payment_date)}</TableCell>
+                        <TableCell>{formatDateOnly(r.delivery_pickup_date)}</TableCell>
                         <TableCell>{pendingFromPayment}</TableCell>
                         <TableCell>{highlightMatch(r.status ?? "—", searchTerm)}</TableCell>
                         <TableCell>{highlightMatch(r.source ?? "—", searchTerm)}</TableCell>
-                        <TableCell>{highlightMatch(r.date_created ?? "—", searchTerm)}</TableCell>
+                        <TableCell>{formatDate(r.date_created)}</TableCell>
                       </TableRow>
                     );
                   })}
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right font-bold">Total (All Pages):</TableCell>
+                    <TableCell colSpan={5} className="text-right font-bold">Total:</TableCell>
                     <TableCell className="font-bold">
                       {filteredRecords.reduce((sum, r) => sum + (Number(r.amount?.toString().replace(/,/g, "")) || 0), 0).toLocaleString()}
                     </TableCell>

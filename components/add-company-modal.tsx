@@ -405,27 +405,16 @@ export function AddCompanyModal({ referenceid, onCreated }: AddCompanyModalProps
                 <Button
                   className="flex-1"
                   variant="outline"
-                  onClick={() => setShowCancelDialog(true)}
+                  onClick={() => setOpen(false)}
                 >
                   Cancel
                 </Button>
+
               </div>
             </FieldSet>
           </FieldGroup>
         </DialogContent>
       </Dialog>
-
-      {/* Cancel Confirmation Dialog */}
-      {showCancelDialog && (
-        <CancelDialog
-          onConfirm={() => {
-            setShowCancelDialog(false);
-            setOpen(false);
-            resetForm();
-          }}
-          onCancel={() => setShowCancelDialog(false)}
-        />
-      )}
     </>
   );
 }

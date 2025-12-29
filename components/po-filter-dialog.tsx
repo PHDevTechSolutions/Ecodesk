@@ -43,47 +43,40 @@ export const POFilterDialog: React.FC<Props> = ({
           <DialogTitle>Filter Purchase Orders</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 mt-2">
-          {/* Status */}
-          <div className="flex flex-col gap-1">
-            <Label>Status</Label>
-            <Select
-              value={filters.status}
-              onValueChange={(v) => setFilters({ ...filters, status: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions(statuses).map((i) => (
-                  <SelectItem key={i} value={i}>
-                    {i}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
-          {/* Sales Agent */}
-          <div className="flex flex-col gap-1">
-            <Label>Sales Agent</Label>
-            <Select
-              value={filters.sales_agent}
-              onValueChange={(v) => setFilters({ ...filters, sales_agent: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select sales agent" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions(["All", ...salesAgents]).map((i) => (
-                  <SelectItem key={i} value={i}>
-                    {i}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <Label>Status</Label>
+        <Select
+          value={filters.status}
+          onValueChange={(v) => setFilters({ ...filters, status: v })}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent className="w-full">
+            {sortOptions(statuses).map((i) => (
+              <SelectItem key={i} value={i}>
+                {i}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Label>Sales Agent</Label>
+        <Select
+          value={filters.sales_agent}
+          onValueChange={(v) => setFilters({ ...filters, sales_agent: v })}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select sales agent" />
+          </SelectTrigger>
+          <SelectContent className="w-full">
+            {sortOptions(["All", ...salesAgents]).map((i) => (
+              <SelectItem key={i} value={i}>
+                {i}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-2 mt-6">
