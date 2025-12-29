@@ -165,12 +165,15 @@ function POContent() {
     return map;
   }, [companies]);
 
-  const recordsWithCompanyName = useMemo(() => {
-    return records.map((r) => {
-      const acctRef = r.account_reference_number || r.company_ref_number || r.company_name;
-      return { ...r, company_name: companyMap[acctRef] || "Unknown Company" };
-    });
-  }, [records, companyMap]);
+const recordsWithCompanyName = useMemo(() => {
+  return records.map((r) => {
+    const acctRef = r.account_reference_number || r.company_ref_number;
+    return { 
+      ...r, 
+      company_name: companyMap[acctRef] || r.company_name || "Unknown Company" 
+    };
+  });
+}, [records, companyMap]);
 
   // Fetch records
   useEffect(() => {
@@ -293,7 +296,7 @@ function POContent() {
       ];
     });
 
-    const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    const totalAmount = filteredRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     rows.push(["", "", "", "", totalAmount.toString(), "", "", "", "", "", "", "", "", "", "", "Total"]);
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].map((e) => e.join(",")).join("\n");
@@ -409,9 +412,9 @@ function POContent() {
                     );
                   })}
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right font-bold">Total:</TableCell>
+                    <TableCell colSpan={5} className="text-right font-bold">Total (All Pages):</TableCell>
                     <TableCell className="font-bold">
-                      {paginatedRecords.reduce((sum, r) => sum + (Number(r.amount?.toString().replace(/,/g, "")) || 0), 0).toLocaleString()}
+                      {filteredRecords.reduce((sum, r) => sum + (Number(r.amount?.toString().replace(/,/g, "")) || 0), 0).toLocaleString()}
                     </TableCell>
                     <TableCell colSpan={10}></TableCell>
                   </TableRow>

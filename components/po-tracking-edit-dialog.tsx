@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
@@ -14,6 +14,12 @@ interface EditPOProps {
   onClose: () => void;
   record: any;
   onSave: (updatedRecord: any) => void;
+}
+
+interface Company {
+  account_reference_number: string;
+  company_name: string;
+  contact_number: string[] | string;
 }
 
 const SALES_AGENTS = [
@@ -33,6 +39,7 @@ const SALES_AGENTS = [
 export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave }) => {
   const [form, setForm] = useState<any>({
     referenceid: "",
+    company_ref_number: "",
     company_name: "",
     po_number: "",
     amount: "",
@@ -44,24 +51,45 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
     delivery_pickup_date: "",
     source: "",
     status: "",
+    company_ref: "",
   });
 
   const [contactNumbers, setContactNumbers] = useState<string[]>([""]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
 
-  // Safe date parser
   const parseDate = (dateStr: string) => {
     if (!dateStr) return "";
     const parsed = parseISO(dateStr);
     return isValid(parsed) ? format(parsed, "yyyy-MM-dd'T'HH:mm") : "";
   };
 
-  useEffect(() => {
-    if (record) {
-      const numbers = record.contact_number?.split(" / ").filter(Boolean) || [""];
+  const fetchCompanies = useCallback(async () => {
+    setLoadingCompanies(true);
+    setErrorCompanies(null);
+    try {
+      const res = await fetch("/api/com-fetch-po-company", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch companies");
+      const data = await res.json();
+      setCompanies(data.data || []);
+    } catch (err: any) {
+      setErrorCompanies(err.message || "Error fetching companies");
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    if (isOpen) fetchCompanies();
+  }, [isOpen, fetchCompanies]);
+
+  // Populate form with record and select correct company
+  useEffect(() => {
+    if (record && companies.length) {
+      const selectedCompany = companies.find(c => String(c.account_reference_number) === String(record.account_reference_number));
       setForm({
         referenceid: record.referenceid || "",
-        company_name: record.company_name || "",
         po_number: record.po_number || "",
         amount: record.amount || "",
         so_number: record.so_number || "",
@@ -72,14 +100,40 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
         delivery_pickup_date: parseDate(record.delivery_pickup_date),
         source: record.source || "",
         status: record.status || "",
+        company_name: selectedCompany?.company_name || record.company_name || "",
+        company_ref_number: selectedCompany?.account_reference_number || record.account_reference_number || "",
+        company_ref: selectedCompany?.account_reference_number || record.account_reference_number || "",
       });
 
-      setContactNumbers(numbers);
+      setContactNumbers(
+        record.contact_number?.split(/\s*\/\s*/).filter(Boolean) || [""]
+      );
     }
-  }, [record]);
+  }, [record, companies]);
 
   const handleChange = (key: string, value: any) => {
-    setForm((prev: any) => ({ ...prev, [key]: value }));
+    if (key === "company_ref_number") {
+      const selectedCompany = companies.find(c => String(c.account_reference_number) === String(value));
+      setForm((prev: any) => ({
+        ...prev,
+        company_ref_number: value,
+        company_name: selectedCompany?.company_name || "",
+        company_ref: selectedCompany?.account_reference_number || "",
+      }));
+
+      if (selectedCompany) {
+        const numbers = Array.isArray(selectedCompany.contact_number)
+          ? selectedCompany.contact_number
+          : typeof selectedCompany.contact_number === "string"
+          ? selectedCompany.contact_number.split(/\s*\/\s*/).filter(Boolean)
+          : [""];
+        setContactNumbers(numbers);
+      } else {
+        setContactNumbers([""]);
+      }
+    } else {
+      setForm((prev: any) => ({ ...prev, [key]: value }));
+    }
   };
 
   const handleContactChange = (index: number, value: string) => {
@@ -99,9 +153,11 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
   const handleSave = async () => {
     try {
       const payload = {
+        ...record,
         ...form,
         contact_number: contactNumbers.filter(Boolean).join(" / "),
-        id: record._id,
+        account_reference_number: form.company_ref,
+        _id: record._id,
       };
 
       const res = await fetch("/api/po-edit-record", {
@@ -136,17 +192,37 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
             handleSave();
           }}
         >
+          {/* Company Dropdown */}
           <Field>
             <FieldLabel>Company</FieldLabel>
             <FieldContent>
-              <Input
-                name="company_name"
-                value={form.company_name}
-                onChange={e => handleChange("company_name", e.target.value)}
-              />
+              <Select
+                value={form.company_ref_number}
+                onValueChange={v => handleChange("company_ref_number", v)}
+                disabled={loadingCompanies}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {companies.find(c => String(c.account_reference_number) === String(form.company_ref_number))?.company_name
+                      || (loadingCompanies ? "Loading..." : "Select company")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c, idx) => (
+                    <SelectItem
+                      key={c.account_reference_number ?? c.company_name ?? idx}
+                      value={c.account_reference_number}
+                    >
+                      {c.company_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errorCompanies && <p className="text-red-500 text-sm mt-1">{errorCompanies}</p>}
             </FieldContent>
           </Field>
 
+          {/* Contact Numbers */}
           <Field>
             <FieldLabel>Contact Number</FieldLabel>
             <FieldContent>
@@ -159,9 +235,7 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
                       onChange={e => handleContactChange(idx, e.target.value)}
                       className="flex-grow"
                     />
-                    <Button variant="outline" type="button" onClick={() => removeContactField(idx)}>
-                      −
-                    </Button>
+                    <Button variant="outline" type="button" onClick={() => removeContactField(idx)}>−</Button>
                   </div>
                 ))}
                 <Button variant="secondary" type="button" onClick={addContactField}>
@@ -171,49 +245,32 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
             </FieldContent>
           </Field>
 
+          {/* Remaining fields */}
           <Field>
             <FieldLabel>PO Number</FieldLabel>
             <FieldContent>
-              <Input
-                name="po_number"
-                value={form.po_number}
-                onChange={e => handleChange("po_number", e.target.value)}
-              />
+              <Input name="po_number" value={form.po_number} onChange={e => handleChange("po_number", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Amount</FieldLabel>
             <FieldContent>
-              <Input
-                name="amount"
-                type="number"
-                value={form.amount}
-                onChange={e => handleChange("amount", e.target.value)}
-              />
+              <Input name="amount" type="number" value={form.amount} onChange={e => handleChange("amount", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>SO Number</FieldLabel>
             <FieldContent>
-              <Input
-                name="so_number"
-                value={form.so_number}
-                onChange={e => handleChange("so_number", e.target.value)}
-              />
+              <Input name="so_number" value={form.so_number} onChange={e => handleChange("so_number", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>SO Date</FieldLabel>
             <FieldContent>
-              <Input
-                type="datetime-local"
-                name="so_date"
-                value={form.so_date}
-                onChange={e => handleChange("so_date", e.target.value)}
-              />
+              <Input type="datetime-local" name="so_date" value={form.so_date} onChange={e => handleChange("so_date", e.target.value)} />
             </FieldContent>
           </Field>
 
@@ -222,7 +279,7 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
             <FieldContent>
               <Select value={form.sales_agent} onValueChange={v => handleChange("sales_agent", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Agent" />
+                  <SelectValue>{form.sales_agent || "Select Agent"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {SALES_AGENTS.map(agent => (
@@ -236,46 +293,28 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
           <Field>
             <FieldLabel>Payment Terms</FieldLabel>
             <FieldContent>
-              <Input
-                name="payment_terms"
-                value={form.payment_terms}
-                onChange={e => handleChange("payment_terms", e.target.value)}
-              />
+              <Input name="payment_terms" value={form.payment_terms} onChange={e => handleChange("payment_terms", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Payment Date</FieldLabel>
             <FieldContent>
-              <Input
-                type="datetime-local"
-                name="payment_date"
-                value={form.payment_date}
-                onChange={e => handleChange("payment_date", e.target.value)}
-              />
+              <Input type="datetime-local" name="payment_date" value={form.payment_date} onChange={e => handleChange("payment_date", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Delivery/Pickup Date</FieldLabel>
             <FieldContent>
-              <Input
-                type="datetime-local"
-                name="delivery_pickup_date"
-                value={form.delivery_pickup_date}
-                onChange={e => handleChange("delivery_pickup_date", e.target.value)}
-              />
+              <Input type="datetime-local" name="delivery_pickup_date" value={form.delivery_pickup_date} onChange={e => handleChange("delivery_pickup_date", e.target.value)} />
             </FieldContent>
           </Field>
 
           <Field>
             <FieldLabel>Source</FieldLabel>
             <FieldContent>
-              <Input
-                name="source"
-                value={form.source}
-                onChange={e => handleChange("source", e.target.value)}
-              />
+              <Input name="source" value={form.source} onChange={e => handleChange("source", e.target.value)} />
             </FieldContent>
           </Field>
 
@@ -284,7 +323,7 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
             <FieldContent>
               <Select value={form.status} onValueChange={v => handleChange("status", v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Status" />
+                  <SelectValue>{form.status || "Select Status"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {["PO Received"].map(s => (
@@ -296,9 +335,7 @@ export const EditPO: React.FC<EditPOProps> = ({ isOpen, onClose, record, onSave 
           </Field>
 
           <div className="pt-4 flex gap-2 justify-end">
-            <Button variant="outline" onClick={onClose} type="button">
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={onClose} type="button">Cancel</Button>
             <Button type="submit">Save Changes</Button>
           </div>
         </form>
