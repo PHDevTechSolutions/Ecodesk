@@ -412,7 +412,7 @@ const recordsWithCompanyName = useMemo(() => {
                     );
                   })}
                   <TableRow>
-                    <TableCell colSpan={5} className="text-right font-bold">Total (All Pages):</TableCell>
+                    <TableCell colSpan={5} className="text-right font-bold">Total:</TableCell>
                     <TableCell className="font-bold">
                       {filteredRecords.reduce((sum, r) => sum + (Number(r.amount?.toString().replace(/,/g, "")) || 0), 0).toLocaleString()}
                     </TableCell>
