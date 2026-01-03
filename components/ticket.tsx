@@ -19,6 +19,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemMedia,
 import { Progress } from "@/components/ui/progress";
 import { AddCompanyModal } from "./add-company-modal";
 import { Separator } from "@/components/ui/separator"
+import { TicketHistoryDialog } from "./ticket-history-dialog";
 
 interface Company {
     id: string;
@@ -30,6 +31,7 @@ interface Company {
     contact_person: string;
     address: string;
     status: string;
+    referenceid: string;
 }
 
 interface MergedActivity extends Ticket {
@@ -79,18 +81,29 @@ interface Ticket {
     account_reference_number: string;
     date_updated: string;
     date_created: string;
+    close_reason?: string;
+    counter_offer?: string;
+    client_specs?: string;
 }
 
 interface TicketProps {
     referenceid: string;
+    role: string;
     dateCreatedFilterRange: DateRange | undefined;
     setDateCreatedFilterRangeAction: React.Dispatch<
         React.SetStateAction<DateRange | undefined>
     >;
 }
 
+interface Agent {
+    ReferenceID: string;
+    Firstname: string;
+    Lastname: string;
+}
+
 export const Ticket: React.FC<TicketProps> = ({
     referenceid,
+    role,
     dateCreatedFilterRange,
     setDateCreatedFilterRangeAction,
 }) => {
@@ -154,6 +167,27 @@ export const Ticket: React.FC<TicketProps> = ({
     const [exporting, setExporting] = useState(false);
     const [progress, setProgress] = useState(0);
 
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [agentsLoading, setAgentsLoading] = useState(false);
+
+    useEffect(() => {
+        async function fetchAgents() {
+            setAgentsLoading(true);
+            try {
+                const res = await fetch("/api/fetch-agent");
+                if (!res.ok) throw new Error("Failed to fetch agents");
+                const data = await res.json();
+                setAgents(data);
+            } catch (err) {
+                console.error(err);
+                setAgents([]);
+            } finally {
+                setAgentsLoading(false);
+            }
+        }
+        fetchAgents();
+    }, []);
+
     useEffect(() => {
         if (!exporting) {
             setProgress(0);
@@ -210,21 +244,20 @@ export const Ticket: React.FC<TicketProps> = ({
 
     // Fetch activities when referenceid changes
     const fetchActivities = useCallback(async () => {
-        if (!referenceid) {
-            setActivities([]);
-            return;
-        }
         setLoadingActivities(true);
         setErrorActivities(null);
 
         try {
+            // Determine the query param: kung admin, walang filter referenceid
+            // otherwise gamitin referenceid para sa filter
+            const queryParam = role === "Admin" ? "" : `?referenceid=${encodeURIComponent(referenceid)}`;
+
             const res = await fetch(
-                `/api/act-fetch-activity?referenceid=${encodeURIComponent(referenceid)}`,
+                `/api/act-fetch-activity${queryParam}`,
                 {
                     cache: "no-store",
                     headers: {
-                        "Cache-Control":
-                            "no-store, no-cache, must-revalidate, proxy-revalidate",
+                        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
                         Pragma: "no-cache",
                         Expires: "0",
                     },
@@ -243,7 +276,7 @@ export const Ticket: React.FC<TicketProps> = ({
         } finally {
             setLoadingActivities(false);
         }
-    }, [referenceid]);
+    }, [referenceid, role]);
 
     useEffect(() => {
         fetchActivities();
@@ -466,8 +499,11 @@ export const Ticket: React.FC<TicketProps> = ({
         setDialogOpen(true);
     };
 
-    const handleConfirmDone = async () => {
-        if (!selectedActivityId) return;
+        const handleConfirmDone = async (payload: {
+        close_reason: string;
+        counter_offer: string;
+        client_specs: string;
+        }) => {
 
         try {
             setUpdatingId(selectedActivityId);
@@ -483,10 +519,12 @@ export const Ticket: React.FC<TicketProps> = ({
 
             // Prepare updated activity data
             const updatedActivity = {
-                ...activityToUpdate,
-                status: "Closed", // or your desired final status
-                date_updated: new Date().toISOString(),
-                // Add or modify other fields if needed
+            ...activityToUpdate,
+            status: "Closed",
+            close_reason: payload.close_reason,
+            counter_offer: payload.counter_offer,
+            client_specs: payload.client_specs,
+            date_updated: new Date().toISOString(),
             };
 
             const res = await fetch("/api/act-update-status", {
@@ -754,6 +792,14 @@ export const Ticket: React.FC<TicketProps> = ({
         }
     }
 
+    const getAgentNameByReferenceID = (
+    refId: string | null | undefined
+  ): string => {
+    if (!refId) return "-";
+    const agent = agents.find((a) => a.ReferenceID === refId);
+    return agent ? `${agent.Firstname} ${agent.Lastname}` : "-";
+  };
+
     return (
         <div className="flex flex-col md:flex-row gap-4">
             {/* LEFT SIDE — COMPANIES */}
@@ -766,7 +812,6 @@ export const Ticket: React.FC<TicketProps> = ({
                             referenceid={referenceid}
                             onCreated={fetchCompanies} // pass the fetch function here
                         />
-
                     </div>
                 </CardHeader>
 
@@ -787,57 +832,65 @@ export const Ticket: React.FC<TicketProps> = ({
                             type="multiple"
                             className="overflow-auto space-y-2 p-2 max-h-[700px]"
                         >
-                            {displayedCompanies.map((c) => (
-                                <AccordionItem
-                                    key={c.account_reference_number}
-                                    value={c.account_reference_number} //may kaparehas kasi bro
-                                >
-                                    <div className="flex items-center justify-between text-xs font-semibold gap-2 px-4 py-2">
-                                        <AccordionTrigger className="text-xs font-semibold flex-1 text-left">
-                                            <span
-                                                className="flex-1 text-left break-words whitespace-normal"
-                                                style={{ minWidth: 0 }}
+                            {displayedCompanies.map((c) => {
+                                // Find the agent for this company (adjust if needed)
+                                const agentDetails = agents.find((a) => a.ReferenceID === c.referenceid);
+                                const fullName = agentDetails
+                                    ? `${agentDetails.Firstname} ${agentDetails.Lastname}`
+                                    : "(Unknown Agent)";
+
+                                return (
+                                    <AccordionItem
+                                        key={c.account_reference_number}
+                                        value={c.account_reference_number} // may kaparehas kasi bro
+                                    >
+                                        <div className="flex items-center justify-between text-xs font-semibold gap-2 px-4 py-2">
+                                            <AccordionTrigger className="text-xs font-semibold flex-1 text-left">
+                                                <span
+                                                    className="flex-1 text-left break-words whitespace-normal"
+                                                    style={{ minWidth: 0 }}
+                                                >
+                                                    {c.company_name}
+                                                </span>
+                                            </AccordionTrigger>
+
+                                            <Button
+                                                variant="outline"
+                                                disabled={addingAccount === c.account_reference_number}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAddActivity(c);
+                                                }}
+                                                className="text-xs px-3 py-1"
                                             >
-                                                {c.company_name}
-                                            </span>
-                                        </AccordionTrigger>
+                                                {addingAccount === c.account_reference_number ? "Adding..." : "Add"}
+                                            </Button>
+                                        </div>
 
-                                        <Button
-                                            variant="outline"
-                                            disabled={addingAccount === c.account_reference_number}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAddActivity(c);
-                                            }}
-                                            className="text-xs px-3 py-1"
-                                        >
-                                            {addingAccount === c.account_reference_number
-                                                ? "Adding..."
-                                                : "Add"}
-                                        </Button>
-                                    </div>
-
-                                    <AccordionContent className="text-xs px-4 pb-2 pt-0">
-                                        <p>
-                                            <strong>Contact Number:</strong> {c.contact_number || "-"}
-                                        </p>
-                                        <p>
-                                            <strong>Email Address:</strong> {c.email_address || "-"}
-                                        </p>
-                                        <p className="capitalize">
-                                            <strong>Contact Person:</strong> {c.contact_person || "-"}
-                                        </p>
-                                        <p>
-                                            <strong>Type Client:</strong> {c.type_client || "-"}
-                                        </p>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
+                                        <AccordionContent className="text-xs px-4 pb-2 pt-0">
+                                            <p>
+                                                <strong>Contact Number:</strong> {c.contact_number || "-"}
+                                            </p>
+                                            <p>
+                                                <strong>Email Address:</strong> {c.email_address || "-"}
+                                            </p>
+                                            <p className="capitalize">
+                                                <strong>Contact Person:</strong> {c.contact_person || "-"}
+                                            </p>
+                                            <p className="mb-2">
+                                                <strong>Type Client:</strong> {c.type_client || "-"}
+                                            </p>
+                                            <p className="uppercase">
+                                                <strong>Current Handler:</strong> {fullName}
+                                            </p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                );
+                            })}
                         </Accordion>
                     )}
                 </CardContent>
             </Card>
-
 
             {/* RIGHT SIDE — ACTIVITIES */}
             <Card className="w-full md:w-2/3 p-4 rounded-xl flex flex-col">
@@ -896,166 +949,127 @@ export const Ticket: React.FC<TicketProps> = ({
                 </div>
 
                 {/* ACTIVITIES LIST */}
-                <div className="max-h-[600px] overflow-auto space-y-4 custom-scrollbar flex-grow">
-                    <Accordion type="single" collapsible className="w-full">
-                        {paginatedActivities.map((item, index) => {
-                            let badgeColor: "default" | "secondary" | "outline" = "default";
+                <div className="max-h-[600px] overflow-auto space-y-3 custom-scrollbar flex-grow">
+                {paginatedActivities.map((item, index) => {
+                    let badgeColor: "default" | "secondary" | "outline" = "default";
 
-                            if (item.status === "Assisted" || item.status === "SO-Done") {
-                                badgeColor = "secondary";
-                            } else if (item.status === "Quote-Done") {
-                                badgeColor = "outline";
-                            }
+                    if (item.status === "Assisted" || item.status === "SO-Done") {
+                    badgeColor = "secondary";
+                    } else if (item.status === "Quote-Done") {
+                    badgeColor = "outline";
+                    }
 
-                            const isChecked = selectedToDelete.includes(item._id);
+                    const isChecked = selectedToDelete.includes(item._id);
 
-                            return (
-                                <AccordionItem key={`${item._id}-${index}`} value={String(item._id)}>
-                                    <div className="p-2 flex items-center space-x-2">
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center">
-                                                <AccordionTrigger className="flex-1 text-xs font-semibold cursor-pointer">
-                                                    {showCheckboxes && (
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isChecked}
-                                                            onChange={() => toggleSelect(item._id)}
-                                                            className="ml-1 w-5 h-5 cursor-pointer"
-                                                            onClick={(e) => e.stopPropagation()} // prevent accordion toggle
-                                                        />
-                                                    )}
-                                                    {new Date(item.date_updated ?? item.date_created).toLocaleDateString()}{" "}
-                                                    <span className="text-[10px] text-muted-foreground mx-1">|</span>{" "}
-                                                    {new Date(item.date_updated ?? item.date_created).toLocaleTimeString([], {
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                    })}{" "}
-                                                    <span className="mx-1">-</span> {item.company_name}
-                                                </AccordionTrigger>
+                    return (
+                    <div
+                        key={`${item._id}-${index}`}
+                        className="border rounded-lg p-3 flex items-start justify-between gap-3"
+                    >
+                        {/* LEFT INFO */}
+                        <div className="flex-1 text-xs">
+                        <div className="flex items-center gap-2">
+                            {showCheckboxes && (
+                            <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelect(item._id)}
+                                className="w-4 h-4 cursor-pointer"
+                            />
+                            )}
 
-                                                {!showCheckboxes && (
-                                                    <div className="flex gap-2 ml-4">
-                                                        <UpdateTicketDialog
-                                                            {...{
-                                                                _id: item._id,
-                                                                ticket_reference_number: item.ticket_reference_number,
-                                                                ticket_received: item.ticket_received,
-                                                                ticket_endorsed: item.ticket_endorsed,
-                                                                traffic: item.traffic,
-                                                                source_company: item.source_company,
-                                                                gender: item.gender,
-                                                                channel: item.channel,
-                                                                wrap_up: item.wrap_up,
-                                                                source: item.source,
-                                                                customer_type: item.customer_type,
-                                                                customer_status: item.customer_status,
-                                                                status: item.status,
-                                                                department: item.department,
-                                                                manager: item.manager,
-                                                                agent: item.agent,
-                                                                remarks: item.remarks,
-                                                                inquiry: item.inquiry,
-                                                                item_code: item.item_code,
-                                                                item_description: item.item_description,
-                                                                po_number: item.po_number,
-                                                                so_date: item.so_date,
-                                                                so_number: item.so_number,
-                                                                so_amount: item.so_amount,
-                                                                qty_sold: item.qty_sold,
-                                                                quotation_number: item.quotation_number,
-                                                                quotation_amount: item.quotation_amount,
-                                                                payment_terms: item.payment_terms,
-                                                                po_source: item.po_source,
-                                                                payment_date: item.payment_date,
-                                                                delivery_date: item.delivery_date,
-                                                                referenceid: item.referenceid,
-                                                                type_client: item.type_client,
-                                                                contact_number: item.contact_number,
-                                                                email_address: item.email_address,
-                                                                company_name: item.company_name,
-                                                                contact_person: item.contact_person,
-                                                                address: item.address,
-                                                                account_reference_number: item.account_reference_number,
-                                                            }}
-                                                            onCreated={() => fetchActivities()}
-                                                        />
+                            <span className="font-semibold">
+                            {item.company_name}
+                            </span>
+                        </div>
 
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            disabled={updatingId === item._id}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openDoneDialog(item._id);
-                                                            }}
-                                                        >
-                                                            {updatingId === item._id ? "Updating..." : "Closed"}
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
+                        <div className="text-muted-foreground mt-1">
+                            {new Date(item.date_updated ?? item.date_created).toLocaleDateString()}{" "}
+                            {new Date(item.date_updated ?? item.date_created).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            })}
+                        </div>
 
-                                            <div className="ml-1">
-                                                <Badge variant={badgeColor} className="text-[8px]">
-                                                    {item.status.replace("-", " ")}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    </div>
+                        <div className="mt-1">
+                            <Badge variant={badgeColor} className="text-[8px]">
+                            {item.status.replace("-", " ")}
+                            </Badge>
+                            {" "}–{" "}
+                            <span className="capitalize font-bold">
+                            {getAgentNameByReferenceID(item.referenceid)}
+                            </span>
+                        </div>
+                        </div>
 
-                                    <AccordionContent className="text-xs px-4 py-2">
-                                        {/* Always show contact info */}
-                                        <p className="uppercase"><strong>Ticket #:</strong> {item.ticket_reference_number || "-"}</p>
-                                        <Separator className="my-4" />
-                                        <p className="capitalize"><strong>Contact Person:</strong> {item.contact_person || "-"}</p>
-                                        <p><strong>Contact Number:</strong> {item.contact_number || "-"}</p>
-                                        <p><strong>Email Address:</strong> {item.email_address || "-"}</p>
-                                        <p><strong>Date Created:</strong> {new Date(item.date_created).toLocaleDateString()}</p>
+                        {/* RIGHT ACTIONS */}
+                        {!showCheckboxes && (
+                        <div className="flex gap-2 flex-shrink-0">
+                            {/* VIEW HISTORY MODAL */}
+                            <TicketHistoryDialog item={item} />
 
-                                        {/* Define the ticket fields to display */}
-                                        {[
-                                            { label: "Ticket Received", value: item.ticket_received },
-                                            { label: "Ticket Endorsed", value: item.ticket_endorsed },
-                                            { label: "Traffic", value: item.traffic },
-                                            { label: "Source Company", value: item.source_company },
-                                            { label: "Channel", value: item.channel },
-                                            { label: "Wrap Up", value: item.wrap_up },
-                                            { label: "Source", value: item.source },
-                                            { label: "Customer Type", value: item.customer_type },
-                                            { label: "Customer Status", value: item.customer_status },
-                                            { label: "Status", value: item.status },  // status is mandatory so will always show
-                                            { label: "Department", value: item.department },
-                                            { label: "Manager", value: item.manager },
-                                            { label: "Agent", value: item.agent },
-                                            { label: "Remarks", value: item.remarks },
-                                            { label: "Inquiry", value: item.inquiry },
-                                            { label: "Item Code", value: item.item_code },
-                                            { label: "Item Description", value: item.item_description },
-                                            { label: "PO Number", value: item.po_number },
-                                            { label: "SO Date", value: item.so_date },
-                                            { label: "SO Number", value: item.so_number },
-                                            { label: "SO Amount", value: item.so_amount },
-                                            { label: "Quantity Sold", value: item.qty_sold },
-                                            { label: "Quotation Number", value: item.quotation_number },
-                                            { label: "Quotation Amount", value: item.quotation_amount },
-                                            { label: "Payment Terms", value: item.payment_terms },
-                                            { label: "PO Source", value: item.po_source },
-                                            { label: "Payment Date", value: item.payment_date },
-                                            { label: "Delivery Date", value: item.delivery_date },
-                                        ].map(({ label, value }) =>
-                                            value ? (
-                                                <p key={label}>
-                                                    <strong>{label}:</strong> {value}
-                                                </p>
-                                            ) : null
-                                        )}
-                                    </AccordionContent>
+                            {/* UPDATE */}
+                            <UpdateTicketDialog
+                            {...{
+                                _id: item._id,
+                                ticket_reference_number: item.ticket_reference_number,
+                                ticket_received: item.ticket_received,
+                                ticket_endorsed: item.ticket_endorsed,
+                                traffic: item.traffic,
+                                source_company: item.source_company,
+                                gender: item.gender,
+                                channel: item.channel,
+                                wrap_up: item.wrap_up,
+                                source: item.source,
+                                customer_type: item.customer_type,
+                                customer_status: item.customer_status,
+                                status: item.status,
+                                department: item.department,
+                                manager: item.manager,
+                                agent: item.agent,
+                                remarks: item.remarks,
+                                inquiry: item.inquiry,
+                                item_code: item.item_code,
+                                item_description: item.item_description,
+                                po_number: item.po_number,
+                                so_date: item.so_date,
+                                so_number: item.so_number,
+                                so_amount: item.so_amount,
+                                qty_sold: item.qty_sold,
+                                quotation_number: item.quotation_number,
+                                quotation_amount: item.quotation_amount,
+                                payment_terms: item.payment_terms,
+                                po_source: item.po_source,
+                                payment_date: item.payment_date,
+                                delivery_date: item.delivery_date,
+                                referenceid: item.referenceid,
+                                type_client: item.type_client,
+                                contact_number: item.contact_number,
+                                email_address: item.email_address,
+                                company_name: item.company_name,
+                                contact_person: item.contact_person,
+                                address: item.address,
+                                account_reference_number: item.account_reference_number,
+                            }}
+                            onCreated={() => fetchActivities()}
+                            />
 
-                                </AccordionItem>
-                            );
-                        })}
-                    </Accordion>
+                            {/* CLOSE */}
+                            <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={updatingId === item._id}
+                            onClick={() => openDoneDialog(item._id)}
+                            >
+                            {updatingId === item._id ? "Updating..." : "Closed"}
+                            </Button>
+                        </div>
+                        )}
+                    </div>
+                    );
+                })}
                 </div>
+
 
                 {/* PAGINATION CONTROLS */}
                 <div className="mt-4 flex justify-center items-center space-x-2 text-xs">
@@ -1107,9 +1121,9 @@ export const Ticket: React.FC<TicketProps> = ({
             </Card>
 
             <DoneDialog
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
-                onConfirm={handleConfirmDone}
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            onConfirm={handleConfirmDone}
             />
 
             {exporting && (
@@ -1136,8 +1150,6 @@ export const Ticket: React.FC<TicketProps> = ({
                     </Item>
                 </div>
             )}
-
         </div>
-
     );
 };

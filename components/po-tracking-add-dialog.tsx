@@ -49,64 +49,11 @@ const SALES_AGENTS = [
 ];
 
 interface Company {
-  account_reference_number: string;
+  id: string;
   company_name: string;
-  contact_number: string[];
+  contact_number: string;
+  contact_person: string;
 }
-
-const ContactNumberInput = React.memo(function ContactNumberInput({
-  index,
-  value,
-  onChange,
-  onRemove,
-  disableRemove,
-}: {
-  index: number;
-  value: string;
-  onChange: (index: number, value: string) => void;
-  onRemove: (index: number) => void;
-  disableRemove: boolean;
-}) {
-  // Debounce the onChange calls to reduce frequent updates
-  const debouncedChange = React.useMemo(
-    () =>
-      debounce((val: string) => {
-        onChange(index, val);
-      }, 300),
-    [index, onChange]
-  );
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    debouncedChange(e.target.value);
-  };
-
-  // Cancel debounce on unmount
-  useEffect(() => {
-    return () => {
-      debouncedChange.cancel();
-    };
-  }, [debouncedChange]);
-
-  return (
-    <div className="flex gap-2 items-center">
-      <Input
-        type="tel"
-        defaultValue={value}
-        onChange={handleChange}
-        placeholder="+63 9123456789"
-        className="flex-grow"
-      />
-      <Button
-        variant="outline"
-        type="button"
-        onClick={() => onRemove(index)}
-        disabled={disableRemove}
-      >
-        −
-      </Button>
-    </div>
-  );
-});
 
 export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
   isOpen,
@@ -159,22 +106,23 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
   const fetchCompanies = useCallback(async () => {
     setLoadingCompanies(true);
     setErrorCompanies(null);
-
     try {
-      const res = await fetch("/api/com-fetch-po-company", {
-        cache: "no-store",
-      });
-
-      if (!res.ok) throw new Error("Failed to fetch company data");
-
+      const res = await fetch("/api/com-fetch-po-company", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch companies");
       const data = await res.json();
       setCompanies(data.data || []);
-    } catch (err: any) {
-      setErrorCompanies(err.message || "Error fetching company data");
+    } catch (error: any) {
+      setErrorCompanies(error.message || "Error fetching companies");
     } finally {
       setLoadingCompanies(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCompanies();
+    }
+  }, [isOpen, fetchCompanies]);
 
   useEffect(() => {
     if (!isOpen || companiesFetched.current) return;
@@ -183,41 +131,54 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
     fetchCompanies();
   }, [isOpen, fetchCompanies]);
 
+
+  const handleCompanyChange = (selectedCompanyName: string) => {
+    // Hanapin yung company object base sa company_name
+    const selectedCompany = companies.find(c => c.company_name === selectedCompanyName);
+
+    if (selectedCompany) {
+      setForm((prev) => ({
+        ...prev,
+        company_name: selectedCompany.company_name,
+        customer_name: selectedCompany.contact_person || "",
+      }));
+
+      // Assume contact_number is a string, pwede multiple separated by delimiter kung gusto mo i-split
+      const contacts = selectedCompany.contact_number
+        ? selectedCompany.contact_number.split("/").map(num => num.trim())
+        : [""];
+
+      setContactNumbers(contacts.length > 0 ? contacts : [""]);
+    } else {
+      // Kung walang company selected, reset
+      setForm((prev) => ({
+        ...prev,
+        company_name: "",
+        customer_name: "",
+      }));
+      setContactNumbers([""]);
+    }
+  };
+
   const handleChange = (key: string, value: any) => {
     if (key === "company_name") {
       setForm((prev) => ({ ...prev, company_name: value }));
-
-      // Find company by account_reference_number
-      const selectedCompany = companies.find(
-        (c) => c.account_reference_number === value
-      );
-
-      if (selectedCompany && selectedCompany.contact_number) {
-        if (Array.isArray(selectedCompany.contact_number)) {
-          setContactNumbers(selectedCompany.contact_number);
-        } else if (typeof selectedCompany.contact_number === "string") {
-          setContactNumbers([selectedCompany.contact_number]);
-        } else {
-          setContactNumbers([""]);
-        }
-      } else {
-        setContactNumbers([""]);
-      }
     } else {
       setForm((prev) => ({ ...prev, [key]: value }));
     }
   };
 
-  // Update contact number without debounce here (called from debounced child)
-  const updateContactNumber = useCallback((index: number, value: string) => {
-    setContactNumbers((prev) => {
-      const updated = [...prev];
-      updated[index] = value;
-      return updated;
-    });
-  }, []);
+  // Contact numbers handlers
+  const handleContactChange = (index: number, value: string) => {
+    const updated = [...contactNumbers];
+    updated[index] = value;
+    setContactNumbers(updated);
+  };
 
-  const addContactField = () => setContactNumbers((prev) => [...prev, ""]);
+  const addContactField = () => {
+    setContactNumbers((prev) => [...prev, ""]);
+  };
+
   const removeContactField = (index: number) => {
     if (contactNumbers.length === 1) return;
     const updated = [...contactNumbers];
@@ -279,34 +240,29 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <Field>
-            <FieldLabel>Company Name</FieldLabel>
+            <FieldLabel htmlFor="company_name">Company</FieldLabel>
             <FieldContent>
-<Select
-  value={form.company_name}
-  onValueChange={(value) => handleChange("company_name", value)}
-  disabled={loadingCompanies}
->
-  <SelectTrigger>
-    <SelectValue
-      placeholder={loadingCompanies ? "Loading companies..." : "Select company"}
-    />
-  </SelectTrigger>
+              {loadingCompanies ? (
+                <p>Loading companies...</p>
+              ) : errorCompanies ? (
+                <p className="text-red-500">{errorCompanies}</p>
+              ) : (
+                <Select
+                  value={form.company_name}
+                  onValueChange={handleCompanyChange}
+                >
+                  <SelectTrigger id="company_name" aria-label="Select Company" className="w-full">
+                    <SelectValue placeholder="Select Company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.company_name}>
+                        {company.company_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-<SelectContent>
-  {companies.map((company, idx) => (
-    <SelectItem
-      key={company.account_reference_number ?? company.company_name ?? idx}
-      value={company.company_name}
-    >
-      {company.company_name}
-    </SelectItem>
-  ))}
-</SelectContent>
-
-</Select>
-
-              {errorCompanies && (
-                <p className="text-sm text-red-500 mt-1">{errorCompanies}</p>
               )}
             </FieldContent>
           </Field>
@@ -316,14 +272,24 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
             <FieldContent>
               <div className="space-y-2">
                 {contactNumbers.map((num, idx) => (
-                  <ContactNumberInput
-                    key={idx}
-                    index={idx}
-                    value={num}
-                    onChange={updateContactNumber}
-                    onRemove={removeContactField}
-                    disableRemove={contactNumbers.length === 1}
-                  />
+                  <div key={idx} className="flex gap-2 items-center">
+                    <Input
+                      type="tel"
+                      value={num}
+                      onChange={(e) => handleContactChange(idx, e.target.value)}
+                      placeholder="+63 9123456789"
+                      className="flex-grow"
+                      name={`contact_number_${idx}`}
+                    />
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => removeContactField(idx)}
+                      aria-label="Remove contact number"
+                    >
+                      −
+                    </Button>
+                  </div>
                 ))}
                 <Button variant="secondary" type="button" onClick={addContactField}>
                   + Add another number
@@ -384,7 +350,7 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
                 value={form.sales_agent}
                 onValueChange={(v) => handleChange("sales_agent", v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Agent" />
                 </SelectTrigger>
                 <SelectContent>
@@ -405,7 +371,7 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
                 value={form.payment_terms}
                 onValueChange={(v) => handleChange("payment_terms", v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Payment Terms" />
                 </SelectTrigger>
                 <SelectContent>
@@ -447,7 +413,7 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
                 value={form.source}
                 onValueChange={(v) => handleChange("source", v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Source" />
                 </SelectTrigger>
                 <SelectContent>
@@ -466,7 +432,7 @@ export const POTrackingAddDialog: React.FC<POTrackingAddDialogProps> = ({
                 value={form.remarks}
                 onValueChange={(v) => handleChange("remarks", v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

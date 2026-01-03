@@ -18,6 +18,7 @@ import { type DateRange } from "react-day-picker";
 
 interface UserDetails {
     referenceid: string;
+    role: string;
 }
 
 function DashboardContent() {
@@ -26,6 +27,7 @@ function DashboardContent() {
 
     const [userDetails, setUserDetails] = useState<UserDetails>({
         referenceid: "",
+        role: "",
     });
 
     const [loadingUser, setLoadingUser] = useState(true);
@@ -61,6 +63,7 @@ function DashboardContent() {
 
                 setUserDetails({
                     referenceid: data.ReferenceID || "",
+                    role: data.Role || "",
                 });
 
                 toast.success("User data loaded successfully!");
@@ -93,10 +96,11 @@ function DashboardContent() {
                     </div>
                 </header>
 
-                <main className="flex flex-1 flex-col gap-4 p-4 overflow-auto">
+                <main className="flex flex-col gap-4 p-4">
                     <div>
                         <SKU
                             referenceid={userDetails.referenceid}
+                            role={userDetails.role}
                             dateCreatedFilterRange={dateCreatedFilterRange}
                             setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />
                     </div>

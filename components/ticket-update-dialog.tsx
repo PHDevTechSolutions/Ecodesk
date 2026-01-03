@@ -226,6 +226,10 @@ export function UpdateTicketDialog({
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState("");
 
+  const [closeReason, setCloseReason] = useState("");
+  const [counterOffer, setCounterOffer] = useState("");
+  const [clientSpecs, setClientSpecs] = useState("");
+
   useEffect(() => {
     setActivityRef(_id || "");
     setClientSegment(type_client || "");
@@ -311,42 +315,52 @@ export function UpdateTicketDialog({
   const handleUpdate = async () => {
     setLoading(true);
 
-    const newActivity: Activity = {
-      _id: activityRef,
-      ticket_reference_number: ticketReferenceNumber,
-      client_segment: clientSegment,
-      traffic: trafficState,
-      source_company: sourceCompanyState,
-      ticket_received: ticketReceivedState,
-      ticket_endorsed: ticketEndorsedState,
-      gender: genderState,
-      channel: channelState,
-      wrap_up: wrapUpState,
-      source: sourceState,
-      customer_type: customerTypeState,
-      customer_status: customerStatusState,
-      status: statusState,
-      department: departmentState,
-      manager: managerState,
-      agent: agentState,
-      remarks: remarksState,
-      inquiry: inquiryState,
-      item_code: itemCodeState,
-      item_description: itemDescriptionState,
-      po_number: poNumberState,
-      so_date: soDateState,
-      so_number: soNumberState,
-      so_amount: soAmountState,
-      quotation_number: quotationNumberState,
-      quotation_amount: quotationAmountState,
-      qty_sold: qtySoldState,
-      payment_terms: paymentTermsState,
-      po_source: poSourceState,
-      payment_date: paymentDateState,
-      delivery_date: deliveryDateState,
-      date_created: dateCreatedState,
-      date_updated: new Date().toISOString(),
-    };
+const newActivity: Activity & {
+  close_reason?: string;
+  counter_offer?: string;
+  client_specs?: string;
+} = {
+  _id: activityRef,
+  ticket_reference_number: ticketReferenceNumber,
+  client_segment: clientSegment,
+  traffic: trafficState,
+  source_company: sourceCompanyState,
+  ticket_received: ticketReceivedState,
+  ticket_endorsed: ticketEndorsedState,
+  gender: genderState,
+  channel: channelState,
+  wrap_up: wrapUpState,
+  source: sourceState,
+  customer_type: customerTypeState,
+  customer_status: customerStatusState,
+  status: statusState,
+  department: departmentState,
+  manager: managerState,
+  agent: agentState,
+  remarks: remarksState,
+  inquiry: inquiryState,
+  item_code: itemCodeState,
+  item_description: itemDescriptionState,
+  po_number: poNumberState,
+  so_date: soDateState,
+  so_number: soNumberState,
+  so_amount: soAmountState,
+  quotation_number: quotationNumberState,
+  quotation_amount: quotationAmountState,
+  qty_sold: qtySoldState,
+  payment_terms: paymentTermsState,
+  po_source: poSourceState,
+  payment_date: paymentDateState,
+  delivery_date: deliveryDateState,
+  date_created: dateCreatedState,
+  date_updated: new Date().toISOString(),
+
+  ...(statusState === "Closed" && {
+    close_reason: closeReason,
+    counter_offer: counterOffer,
+    client_specs: clientSpecs,
+  }),
+};
 
     try {
       const res = await fetch("/api/act-save-activity", {
@@ -673,6 +687,12 @@ export function UpdateTicketDialog({
                   handleBack={() => setStep((prev) => prev - 1)}
                   handleNext={() => setStep((prev) => prev + 1)}
                   handleUpdate={handleUpdate}
+                closeReason={closeReason}
+                setCloseReason={setCloseReason}
+                counterOffer={counterOffer}
+                setCounterOffer={setCounterOffer}
+                clientSpecs={clientSpecs}
+                setClientSpecs={setClientSpecs}
                 />
               )}
             </div>

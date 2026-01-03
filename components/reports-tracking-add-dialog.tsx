@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,14 +30,21 @@ interface AddRecordModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (newRecord: any) => void;
-   referenceId: string; // ✅ add this
+  referenceid: string; // ✅ add this
+}
+
+interface Company {
+  id: string;
+  company_name: string;
+  contact_person: string;
+  contact_number: string;
 }
 
 export const AddRecordModal: React.FC<AddRecordModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  referenceId, // ✅ add this
+  referenceid, // ✅ add this
 }) => {
   const STATUS_OPTIONS = ["Open", "Closed"];
 
@@ -55,6 +62,31 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
     nature_of_concern: "",
     remarks: "",
   });
+
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
+
+  const fetchCompanies = useCallback(async () => {
+    setLoadingCompanies(true);
+    setErrorCompanies(null);
+    try {
+      const res = await fetch("/api/com-fetch-po-company", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch companies");
+      const data = await res.json();
+      setCompanies(data.data || []);
+    } catch (error: any) {
+      setErrorCompanies(error.message || "Error fetching companies");
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCompanies();
+    }
+  }, [isOpen, fetchCompanies]);
 
   // Multiple contact numbers as separate state
   const [contactNumbers, setContactNumbers] = useState<string[]>([""]);
@@ -77,6 +109,34 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
     setContactNumbers(updated);
   };
 
+  const handleCompanyChange = (selectedCompanyName: string) => {
+    // Hanapin yung company object base sa company_name
+    const selectedCompany = companies.find(c => c.company_name === selectedCompanyName);
+
+    if (selectedCompany) {
+      setForm((prev) => ({
+        ...prev,
+        company_name: selectedCompany.company_name,
+        customer_name: selectedCompany.contact_person || "",
+      }));
+
+      // Assume contact_number is a string, pwede multiple separated by delimiter kung gusto mo i-split
+      const contacts = selectedCompany.contact_number
+        ? selectedCompany.contact_number.split("/").map(num => num.trim())
+        : [""];
+
+      setContactNumbers(contacts.length > 0 ? contacts : [""]);
+    } else {
+      // Kung walang company selected, reset
+      setForm((prev) => ({
+        ...prev,
+        company_name: "",
+        customer_name: "",
+      }));
+      setContactNumbers([""]);
+    }
+  };
+
   const addContactField = () => {
     setContactNumbers((prev) => [...prev, ""]);
   };
@@ -86,19 +146,6 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
     const updated = [...contactNumbers];
     updated.splice(index, 1);
     setContactNumbers(updated);
-  };
-
-  // Format datetime-local value for inputs, or empty string
-  const formatDateTimeLocal = (dateStr: string | null | undefined) => {
-    if (!dateStr) return "";
-    try {
-      // parseISO supports strings like '2023-12-20T14:00'
-      const parsed = parseISO(dateStr);
-      // format to 'yyyy-MM-dd\'T\'HH:mm' for datetime-local input
-      return format(parsed, "yyyy-MM-dd'T'HH:mm");
-    } catch {
-      return "";
-    }
   };
 
   const handleSave = async () => {
@@ -117,7 +164,7 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
 
       // Prepare payload for backend
       const payload = {
-        referenceid: referenceId,
+        referenceid: referenceid,
         ...form,
         contact_number: contactNumberString,
         // Format dates for backend, convert from datetime-local string to desired format
@@ -165,13 +212,28 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
           <Field>
             <FieldLabel htmlFor="company_name">Company</FieldLabel>
             <FieldContent>
-              <Input
-                id="company_name"
-                name="company_name"
-                value={form.company_name}
-                onChange={handleChange}
-                required
-              />
+              {loadingCompanies ? (
+                <p>Loading companies...</p>
+              ) : errorCompanies ? (
+                <p className="text-red-500">{errorCompanies}</p>
+              ) : (
+                <Select
+                  value={form.company_name}
+                  onValueChange={handleCompanyChange}
+                >
+                  <SelectTrigger id="company_name" aria-label="Select Company" className="w-full">
+                    <SelectValue placeholder="Select Company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.company_name}>
+                        {company.company_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+              )}
             </FieldContent>
           </Field>
 

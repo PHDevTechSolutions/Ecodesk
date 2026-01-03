@@ -98,6 +98,14 @@ interface TicketSheetProps {
     setDateCreated: React.Dispatch<React.SetStateAction<string>>;
     ticketReferenceNumber: string;
     setTicketReferenceNumber: React.Dispatch<React.SetStateAction<string>>;
+    closeReason: string;
+    setCloseReason: React.Dispatch<React.SetStateAction<string>>;
+
+    counterOffer: string;
+    setCounterOffer: React.Dispatch<React.SetStateAction<string>>;
+
+    clientSpecs: string;
+    setClientSpecs: React.Dispatch<React.SetStateAction<string>>;
     loading: boolean;
     handleBack: () => void;
     handleNext: () => void;
@@ -267,9 +275,16 @@ export function TicketSheet(props: TicketSheetProps) {
         setAgent,
         ticketReferenceNumber,
         setTicketReferenceNumber,
+        closeReason,
+        setCloseReason,
+        counterOffer,
+        setCounterOffer,
+        clientSpecs,
+        setClientSpecs,
         handleBack,
         handleNext,
         handleUpdate
+        
     } = props;
 
     const [loadingActivities, setLoadingActivities] = useState(false);
@@ -376,14 +391,28 @@ export function TicketSheet(props: TicketSheetProps) {
         return Object.keys(newErrors).length === 0;
     };
 
-    // Validates required fields for step 6 (status)
     const validateStep6 = () => {
-        const newErrors: typeof errors = {};
-        if (!status) newErrors.status = "Status is required.";
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+    const newErrors: typeof errors = {};
 
+    if (!status) {
+        newErrors.status = "Status is required.";
+    }
+
+    if (status === "Closed") {
+        if (!closeReason.trim()) {
+        newErrors.status = "Close reason is required.";
+        }
+        if (!counterOffer.trim()) {
+        newErrors.status = "Counter offer is required.";
+        }
+        if (!clientSpecs.trim()) {
+        newErrors.status = "Client specs are required.";
+        }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+    };
     // Override handleNext to add validation on step 3 and 6
     const onNext = () => {
         if (step === 3) {
@@ -960,6 +989,41 @@ export function TicketSheet(props: TicketSheetProps) {
                             error={errors.status}
                         />
                     </Field>
+
+                    {status === "Closed" && (
+                    <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 space-y-4">
+                        <h4 className="font-semibold text-sm text-red-700">
+                        On Closing of Ticket (Required)
+                        </h4>
+
+                        <Field>
+                        <FieldLabel>1. Add Reason *</FieldLabel>
+                        <Textarea
+                            value={closeReason}
+                            onChange={(e) => setCloseReason(e.target.value)}
+                            placeholder="Enter reason for closing..."
+                        />
+                        </Field>
+
+                        <Field>
+                        <FieldLabel>2. Add Counter Offer *</FieldLabel>
+                        <Textarea
+                            value={counterOffer}
+                            onChange={(e) => setCounterOffer(e.target.value)}
+                            placeholder="Enter counter offer..."
+                        />
+                        </Field>
+
+                        <Field>
+                        <FieldLabel>3. Client Specs *</FieldLabel>
+                        <Textarea
+                            value={clientSpecs}
+                            onChange={(e) => setClientSpecs(e.target.value)}
+                            placeholder="Enter client specifications..."
+                        />
+                        </Field>
+                    </div>
+                    )}
 
                     {status === "Converted into Sales" && (
                         <>
