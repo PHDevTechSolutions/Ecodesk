@@ -1142,14 +1142,14 @@ const selectedActivity = activities.find(
 
             </Card>
 
-<DoneDialog
-  open={dialogOpen}
-  onOpenChange={setDialogOpen}
-  onConfirm={handleConfirmDone}
-  close_reason={selectedActivity?.close_reason}
-  counter_offer={selectedActivity?.counter_offer}
-  client_specs={selectedActivity?.client_specs}
-/>
+            <DoneDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            onConfirm={handleConfirmDone}
+            close_reason={selectedActivity?.close_reason}
+            counter_offer={selectedActivity?.counter_offer}
+            client_specs={selectedActivity?.client_specs}
+            />
 
             {exporting && (
                 <div

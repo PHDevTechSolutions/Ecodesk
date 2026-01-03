@@ -48,6 +48,10 @@ interface Activity {
     qty_sold: number | string;
     status: string;
     customer_status: string;
+    date_updated?: string;
+    ticket_received?: string;
+    ticket_endorsed?: string;
+    wrap_up?: string;
 }
 
 interface Agent {
@@ -141,6 +145,33 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
         return true;
     };
 
+    function diffMinutes(start?: string, end?: string): number {
+        if (!start || !end) return 0;
+
+        const s = new Date(start);
+        const e = new Date(end);
+
+        if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+
+        return Math.max(0, Math.round((e.getTime() - s.getTime()) / 60000));
+    }
+
+    const NON_QUOTATION_WRAPUPS = [
+        "no stocks",
+        "insufficient stocks",
+        "unable to contact",
+        "item not carried",
+        "waiting for client confirmation",
+        "customer requested",
+        "cancellation",
+        "accreditation/partnership",
+        "no response from client",
+        "assisted",
+        "for site visit",
+        "non standard item",
+        "po received",
+        "for occular inspection",
+    ];
     const groupedData = useMemo(() => {
         const map: Record<
             string,
@@ -159,6 +190,12 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
                 newNonBuyingConvertedAmount: number;
                 newExistingActiveConvertedAmount: number;
                 newExistingInactiveConvertedAmount: number;
+                tsmAckTotal: number;
+                tsmAckCount: number;
+                tsmHandlingTotal: number;
+                tsmHandlingCount: number;
+                tsmNonQuotationTotal: number;
+                tsmNonQuotationCount: number;
             }
         > = {};
 
@@ -171,6 +208,18 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
                     (!a.remarks || !["po received"].includes(a.remarks.toLowerCase()))
             )
             .forEach((a) => {
+            const ackTime = diffMinutes(a.ticket_received, a.ticket_endorsed);
+
+            const handlingTime =
+                a.status?.toLowerCase() === "closed"
+                    ? diffMinutes(a.ticket_received, a.date_updated)
+                    : 0;
+
+            const nonQuotationTime =
+                a.status?.toLowerCase() === "closed" &&
+                NON_QUOTATION_WRAPUPS.includes(a.wrap_up?.toLowerCase() || "")
+                    ? diffMinutes(a.ticket_received, a.date_updated)
+                    : 0;
                 const manager = a.manager!.trim();
                 const soAmount = Number(a.so_amount ?? 0);
                 const traffic = a.traffic?.toLowerCase() ?? "";
@@ -194,6 +243,12 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
                         newNonBuyingConvertedAmount: 0,
                         newExistingActiveConvertedAmount: 0,
                         newExistingInactiveConvertedAmount: 0,
+                        tsmAckTotal: 0,
+                        tsmAckCount: 0,
+                        tsmHandlingTotal: 0,
+                        tsmHandlingCount: 0,
+                        tsmNonQuotationTotal: 0,
+                        tsmNonQuotationCount: 0,
                     };
                 }
 
@@ -240,6 +295,20 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
 
                 if (customerStatus === "existing inactive" && status === "converted into sales") {
                     map[manager].newExistingInactiveConvertedAmount += isNaN(soAmount) ? 0 : soAmount;
+                }
+                if (ackTime > 0) {
+                    map[manager].tsmAckTotal += ackTime;
+                    map[manager].tsmAckCount += 1;
+                }
+
+                if (handlingTime > 0) {
+                    map[manager].tsmHandlingTotal += handlingTime;
+                    map[manager].tsmHandlingCount += 1;
+                }
+
+                if (nonQuotationTime > 0) {
+                    map[manager].tsmNonQuotationTotal += nonQuotationTime;
+                    map[manager].tsmNonQuotationCount += 1;
                 }
             });
 
@@ -451,6 +520,9 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
                                     <TableHead className="text-right">New Non-Buying (Converted To Sales)</TableHead>
                                     <TableHead className="text-right">Existing Active (Converted To Sales)</TableHead>
                                     <TableHead className="text-right">Existing Inactive (Converted To Sales)</TableHead>
+                                    <TableHead className="text-right">TSM Ack (mins)</TableHead>
+                                    <TableHead className="text-right">TSM Handling (mins)</TableHead>
+                                    <TableHead className="text-right">TSM Non-Quotation (mins)</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -472,10 +544,28 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
                                         newNonBuyingConvertedAmount,
                                         newExistingActiveConvertedAmount,
                                         newExistingInactiveConvertedAmount,
+                                        tsmAckTotal,
+                                        tsmAckCount,
+                                        tsmHandlingTotal,
+                                        tsmHandlingCount,
+                                        tsmNonQuotationTotal,
+                                        tsmNonQuotationCount,
                                     }, index) => {
                                         const managerDetails = managers.find((a) => a.ReferenceID === manager);
                                         const fullName = managerDetails ? `${managerDetails.Firstname} ${managerDetails.Lastname}` : "(Unknown Agent)";
                                         const rank = index + 1;
+                                        const avgAck =
+                                            tsmAckCount === 0 ? "-" : Math.round(tsmAckTotal / tsmAckCount);
+
+                                        const avgHandling =
+                                            tsmHandlingCount === 0
+                                                ? "-"
+                                                : Math.round(tsmHandlingTotal / tsmHandlingCount);
+
+                                        const avgNonQuotation =
+                                            tsmNonQuotationCount === 0
+                                                ? "-"
+                                                : Math.round(tsmNonQuotationTotal / tsmNonQuotationCount);
 
                                         return (
                                             <TableRow key={manager} className="hover:bg-muted/50">
@@ -524,6 +614,18 @@ const AgentSalesTableCard = forwardRef<AgentSalesConversionCardRef, AgentSalesCo
                                                         maximumFractionDigits: 2,
                                                     })}
                                                 </TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {avgAck === "-" ? "-" : `${avgAck} min`}
+                                                </TableCell>
+
+                                                <TableCell className="text-right font-mono">
+                                                    {avgHandling === "-" ? "-" : `${avgHandling} min`}
+                                                </TableCell>
+
+                                                <TableCell className="text-right font-mono">
+                                                    {avgNonQuotation === "-" ? "-" : `${avgNonQuotation} min`}
+                                                </TableCell>
+
                                             </TableRow>
                                         );
                                     })}
