@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, } from "@/components/ui/card"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemMedia, ItemTitle, } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator"
+import { ReportsSkuTicketDialog } from "./reports-sku-ticket-dialog";
 
 interface Company {
     id: string;
@@ -627,155 +628,119 @@ export const SKU: React.FC<TicketProps> = ({
                     )}
                 </div>
 
-                {/* ACTIVITIES LIST */}
-                <div className="max-h-[600px] overflow-auto custom-scrollbar flex-grow">
-                    <Accordion type="single" collapsible className="w-full">
-                        {paginatedActivities.map((item, index) => {
-                            let badgeColor: "default" | "secondary" | "outline" = "default";
+{/* ACTIVITIES LIST */}
+<div className="max-h-[600px] overflow-auto custom-scrollbar flex-grow space-y-2">
+  {paginatedActivities.map((item, index) => {
+    let badgeColor: "default" | "secondary" | "outline" = "default";
 
-                            if (item.status === "Assisted" || item.status === "SO-Done") {
-                                badgeColor = "secondary";
-                            } else if (item.status === "Quote-Done") {
-                                badgeColor = "outline";
-                            }
+    if (item.status === "Assisted" || item.status === "SO-Done") {
+      badgeColor = "secondary";
+    } else if (item.status === "Quote-Done") {
+      badgeColor = "outline";
+    }
 
-                            const isChecked = selectedToDelete.includes(item._id);
+    const isChecked = selectedToDelete.includes(item._id);
 
-                            return (
-                                <AccordionItem key={`${item._id}-${index}`} value={String(item._id)}>
-                                    <div className="p-2 flex items-center space-x-2">
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center">
-                                                <AccordionTrigger className="flex-1 text-xs font-semibold cursor-pointer">
-                                                    {showCheckboxes && (
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isChecked}
-                                                            onChange={() => toggleSelect(item._id)}
-                                                            className="ml-1 w-5 h-5 cursor-pointer"
-                                                            onClick={(e) => e.stopPropagation()} // prevent accordion toggle
-                                                        />
-                                                    )}
-                                                    {new Date(item.date_updated ?? item.date_created).toLocaleDateString()}{" "}
-                                                    <span className="text-[10px] text-muted-foreground mx-1">|</span>{" "}
-                                                    {new Date(item.date_updated ?? item.date_created).toLocaleTimeString([], {
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                    })}{" "}
-                                                    <span className="mx-1">-</span> {item.company_name}
-                                                </AccordionTrigger>
+    return (
+      <div
+        key={`${item._id}-${index}`}
+        className="border rounded-lg p-3 flex justify-between items-start hover:bg-muted/40 transition"
+      >
+        {/* LEFT SIDE */}
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center gap-2 text-xs font-semibold">
+            {showCheckboxes && (
+              <input
+                type="checkbox"
+                checked={isChecked}
+                onChange={() => toggleSelect(item._id)}
+                className="w-4 h-4 cursor-pointer"
+              />
+            )}
 
-                                                {!showCheckboxes && (
-                                                    <div className="flex gap-2 ml-4">
-                                                        <UpdateTicketDialog
-                                                            {...{
-                                                                _id: item._id,
-                                                                ticket_reference_number: item.ticket_reference_number,
-                                                                ticket_received: item.ticket_received,
-                                                                ticket_endorsed: item.ticket_endorsed,
-                                                                traffic: item.traffic,
-                                                                gender: item.gender,
-                                                                source_company: item.source_company,
-                                                                channel: item.channel,
-                                                                wrap_up: item.wrap_up,
-                                                                source: item.source,
-                                                                customer_type: item.customer_type,
-                                                                customer_status: item.customer_status,
-                                                                status: item.status,
-                                                                department: item.department,
-                                                                manager: item.manager,
-                                                                agent: item.agent,
-                                                                remarks: item.remarks,
-                                                                inquiry: item.inquiry,
-                                                                item_code: item.item_code,
-                                                                item_description: item.item_description,
-                                                                po_number: item.po_number,
-                                                                so_date: item.so_date,
-                                                                so_number: item.so_number,
-                                                                so_amount: item.so_amount,
-                                                                qty_sold: item.qty_sold,
-                                                                quotation_number: item.quotation_number,
-                                                                quotation_amount: item.quotation_amount,
-                                                                payment_terms: item.payment_terms,
-                                                                po_source: item.po_source,
-                                                                payment_date: item.payment_date,
-                                                                delivery_date: item.delivery_date,
-                                                                referenceid: item.referenceid,
-                                                                type_client: item.type_client,
-                                                                contact_number: item.contact_number,
-                                                                email_address: item.email_address,
-                                                                company_name: item.company_name,
-                                                                contact_person: item.contact_person,
-                                                                address: item.address,
-                                                                account_reference_number: item.account_reference_number,
-                                                            }}
-                                                            onCreated={() => fetchActivities()}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
+            <span>
+              {new Date(item.date_updated ?? item.date_created).toLocaleDateString()}
+            </span>
+            <span className="text-muted-foreground text-[10px]">|</span>
+            <span>
+              {new Date(item.date_updated ?? item.date_created).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
 
-                                            <div className="ml-1">
-                                                <Badge variant={badgeColor} className="text-[8px]">
-                                                    {item.status.replace("-", " ")}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    </div>
+          <div className="text-sm font-bold">
+            {item.company_name}
+          </div>
 
-                                    <AccordionContent className="text-xs px-4 py-2">
-                                        {/* Always show contact info */}
-                                        <p className="uppercase"><strong>Ticket #:</strong> {item.ticket_reference_number || "-"}</p>
-                                        <Separator className="my-4" />
-                                        <p className="capitalize"><strong>Contact Person:</strong> {item.contact_person || "-"}</p>
-                                        <p><strong>Contact Number:</strong> {item.contact_number || "-"}</p>
-                                        <p><strong>Email Address:</strong> {item.email_address || "-"}</p>
-                                        <p><strong>Date Created:</strong> {new Date(item.date_created).toLocaleDateString()}</p>
+          <div className="flex items-center gap-2">
+            <Badge variant={badgeColor} className="text-[9px]">
+              {item.status.replace("-", " ")}
+            </Badge>
+            <span className="text-[10px] text-muted-foreground uppercase">
+              {item.ticket_reference_number}
+            </span>
+          </div>
+        </div>
 
-                                        {/* Define the ticket fields to display */}
-                                        {[
-                                            { label: "Ticket Received", value: item.ticket_received },
-                                            { label: "Ticket Endorsed", value: item.ticket_endorsed },
-                                            { label: "Traffic", value: item.traffic },
-                                            { label: "Source Company", value: item.source_company },
-                                            { label: "Channel", value: item.channel },
-                                            { label: "Wrap Up", value: item.wrap_up },
-                                            { label: "Source", value: item.source },
-                                            { label: "Customer Type", value: item.customer_type },
-                                            { label: "Customer Status", value: item.customer_status },
-                                            { label: "Status", value: item.status },  // status is mandatory so will always show
-                                            { label: "Department", value: item.department },
-                                            { label: "Manager", value: item.manager },
-                                            { label: "Agent", value: item.agent },
-                                            { label: "Remarks", value: item.remarks },
-                                            { label: "Inquiry", value: item.inquiry },
-                                            { label: "Item Code", value: item.item_code },
-                                            { label: "Item Description", value: item.item_description },
-                                            { label: "PO Number", value: item.po_number },
-                                            { label: "SO Date", value: item.so_date },
-                                            { label: "SO Number", value: item.so_number },
-                                            { label: "SO Amount", value: item.so_amount },
-                                            { label: "Quantity Sold", value: item.qty_sold },
-                                            { label: "Quotation Number", value: item.quotation_number },
-                                            { label: "Quotation Amount", value: item.quotation_amount },
-                                            { label: "Payment Terms", value: item.payment_terms },
-                                            { label: "PO Source", value: item.po_source },
-                                            { label: "Payment Date", value: item.payment_date },
-                                            { label: "Delivery Date", value: item.delivery_date },
-                                        ].map(({ label, value }) =>
-                                            value ? (
-                                                <p key={label}>
-                                                    <strong>{label}:</strong> {value}
-                                                </p>
-                                            ) : null
-                                        )}
-                                    </AccordionContent>
+        {/* RIGHT SIDE ACTIONS */}
+        {!showCheckboxes && (
+          <div className="flex items-center gap-2">
+            {/* VIEW SKU TICKET (REPLACEMENT FOR ACCORDION CONTENT) */}
+            <ReportsSkuTicketDialog item={item} />
 
-                                </AccordionItem>
-                            );
-                        })}
-                    </Accordion>
-                </div>
+            {/* UPDATE */}
+            <UpdateTicketDialog
+              {...{
+                _id: item._id,
+                ticket_reference_number: item.ticket_reference_number,
+                ticket_received: item.ticket_received,
+                ticket_endorsed: item.ticket_endorsed,
+                traffic: item.traffic,
+                gender: item.gender,
+                source_company: item.source_company,
+                channel: item.channel,
+                wrap_up: item.wrap_up,
+                source: item.source,
+                customer_type: item.customer_type,
+                customer_status: item.customer_status,
+                status: item.status,
+                department: item.department,
+                manager: item.manager,
+                agent: item.agent,
+                remarks: item.remarks,
+                inquiry: item.inquiry,
+                item_code: item.item_code,
+                item_description: item.item_description,
+                po_number: item.po_number,
+                so_date: item.so_date,
+                so_number: item.so_number,
+                so_amount: item.so_amount,
+                qty_sold: item.qty_sold,
+                quotation_number: item.quotation_number,
+                quotation_amount: item.quotation_amount,
+                payment_terms: item.payment_terms,
+                po_source: item.po_source,
+                payment_date: item.payment_date,
+                delivery_date: item.delivery_date,
+                referenceid: item.referenceid,
+                type_client: item.type_client,
+                contact_number: item.contact_number,
+                email_address: item.email_address,
+                company_name: item.company_name,
+                contact_person: item.contact_person,
+                address: item.address,
+                account_reference_number: item.account_reference_number,
+              }}
+              onCreated={() => fetchActivities()}
+            />
+          </div>
+        )}
+      </div>
+    );
+  })}
+</div>
 
                 {/* PAGINATION CONTROLS */}
                 <div className="mt-4 flex justify-center items-center space-x-2 text-xs">

@@ -44,46 +44,53 @@ interface MergedActivity extends Ticket {
 }
 
 interface Ticket {
-    _id: string;
-    ticket_reference_number: string;
-    ticket_received?: string;
-    ticket_endorsed?: string;
-    traffic?: string;
-    source_company?: string;
-    gender: string;
-    channel?: string;
-    wrap_up?: string;
-    source?: string;
-    customer_type?: string;
-    customer_status?: string;
-    status: string;
-    department?: string;
-    manager?: string;
-    agent?: string;
-    remarks?: string;
-    inquiry?: string;
-    item_code?: string;
-    item_description?: string;
-    po_number?: string;
-    so_date?: string;
-    so_number?: string;
-    so_amount?: string;
-    qty_sold?: string;
-    quotation_number?: string;
-    quotation_amount?: string;
-    payment_terms?: string;
-    po_source?: string;
-    payment_date?: string;
-    delivery_date?: string;
+  _id: string;
+  ticket_reference_number: string;
+  ticket_received?: string;
+  ticket_endorsed?: string;
+  traffic?: string;
+  source_company?: string;
+  gender: string;
+  channel?: string;
+  wrap_up?: string;
+  source?: string;
+  customer_type?: string;
+  customer_status?: string;
+  status: string;
+  department?: string;
+  manager?: string;
+  agent?: string;
+  remarks?: string;
+  inquiry?: string;
+  item_code?: string;
+  item_description?: string;
+  po_number?: string;
+  so_date?: string;
+  so_number?: string;
+  so_amount?: string;
+  qty_sold?: string;
+  quotation_number?: string;
+  quotation_amount?: string;
+  payment_terms?: string;
+  po_source?: string;
+  payment_date?: string;
+  delivery_date?: string;
 
-    referenceid: string;
-    activity_reference_number: string;
-    account_reference_number: string;
-    date_updated: string;
-    date_created: string;
-    close_reason?: string;
-    counter_offer?: string;
-    client_specs?: string;
+  referenceid: string;
+  activity_reference_number: string;
+  account_reference_number: string;
+  date_updated: string;
+  date_created: string;
+
+  // ✅ ADD THESE (CAUSE OF ERROR)
+  close_reason?: string;
+  counter_offer?: string;
+  client_specs?: string;
+
+  tsm_acknowledge_date?: string;
+  tsa_acknowledge_date?: string;
+  tsm_handling_time?: string;
+  tsa_handling_time?: string;
 }
 
 interface TicketProps {
@@ -553,47 +560,52 @@ export const Ticket: React.FC<TicketProps> = ({
         }
     };
 
-    const handleAddActivity = async (company: Company) => {
-        if (!referenceid) {
-            toast.error("Missing reference ID");
-            return;
-        }
+const handleAddActivity = async (company: Company) => {
+  if (!referenceid) {
+    toast.error("Missing reference ID");
+    return;
+  }
 
-        setAddingAccount(company.account_reference_number);
+  setAddingAccount(company.account_reference_number);
 
-        const newActivityReferenceNumber = generateActivityReferenceNumber(company.company_name);
+  const newActivityReferenceNumber = generateActivityReferenceNumber(company.company_name);
 
-        const payload = {
-            referenceid, // <-- from props, NOT company
-            account_reference_number: company.account_reference_number,
-            status: "On-Progress",
-            activity_reference_number: newActivityReferenceNumber,
-        };
+  const payload = {
+    referenceid,
+    account_reference_number: company.account_reference_number,
+    status: "On-Progress",
+    activity_reference_number: newActivityReferenceNumber,
+  };
 
-        try {
-            const res = await fetch("/api/act-save-account", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-                cache: "no-store",
-            });
+  try {
+    const res = await fetch("/api/act-save-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
 
-            const json = await res.json();
+    const json = await res.json();
 
-            if (!res.ok) {
-                toast.error(`Failed to save activity: ${json.error || "Unknown error"}`);
-                setAddingAccount(null);
-                return;
-            }
+    if (!res.ok) {
+      toast.error(`Failed to save activity: ${json.error || "Unknown error"}`);
+      setAddingAccount(null);
+      return;
+    }
 
-            toast.success("Activity added.");
-            await fetchActivities();
-        } catch (error) {
-            toast.error("Error saving activity");
-        } finally {
-            setAddingAccount(null);
-        }
-    };
+    toast.success("Activity added.");
+    await fetchActivities();
+  } catch (error) {
+    toast.error("Error saving activity");
+  } finally {
+    setAddingAccount(null);
+  }
+};
+
+// 👇👇👇 PUT THIS RIGHT HERE 👇👇👇
+const selectedActivity = activities.find(
+  (a) => a._id === selectedActivityId
+);
 
     if (isLoading) {
         return (
@@ -1042,6 +1054,16 @@ export const Ticket: React.FC<TicketProps> = ({
                                 po_source: item.po_source,
                                 payment_date: item.payment_date,
                                 delivery_date: item.delivery_date,
+
+                                // ✅ REQUIRED FOR AUTOFILL
+                                close_reason: item.close_reason,
+                                counter_offer: item.counter_offer,
+                                client_specs: item.client_specs,
+                                tsm_acknowledge_date: item.tsm_acknowledge_date,
+                                tsa_acknowledge_date: item.tsa_acknowledge_date,
+                                tsm_handling_time: item.tsm_handling_time,
+                                tsa_handling_time: item.tsa_handling_time,
+
                                 referenceid: item.referenceid,
                                 type_client: item.type_client,
                                 contact_number: item.contact_number,
@@ -1120,11 +1142,14 @@ export const Ticket: React.FC<TicketProps> = ({
 
             </Card>
 
-            <DoneDialog
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            onConfirm={handleConfirmDone}
-            />
+<DoneDialog
+  open={dialogOpen}
+  onOpenChange={setDialogOpen}
+  onConfirm={handleConfirmDone}
+  close_reason={selectedActivity?.close_reason}
+  counter_offer={selectedActivity?.counter_offer}
+  client_specs={selectedActivity?.client_specs}
+/>
 
             {exporting && (
                 <div

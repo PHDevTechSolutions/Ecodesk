@@ -34,6 +34,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { CancelDialog } from "./activity-cancel-dialog";
 import { TicketSheet } from "./sheet-ticket";
 
+const toDatetimeLocal = (value?: string) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 16);
+};
+
 interface Activity {
   _id: string;
   ticket_reference_number: string;
@@ -69,7 +76,12 @@ interface Activity {
   delivery_date: string;
   date_created: string;
   date_updated: string;
+  tsm_acknowledge_date?: string;
+  tsa_acknowledge_date?: string;
+  tsm_handling_time?: string;
+  tsa_handling_time?: string;
 }
+
 
 interface UpdateActivityDialogProps {
   onCreated: (newActivity: Activity) => void;
@@ -113,6 +125,14 @@ interface UpdateActivityDialogProps {
   payment_date?: string;
   delivery_date?: string;
   date_created?: string;
+  close_reason?: string;
+  counter_offer?: string;
+  client_specs?: string;
+
+  tsm_acknowledge_date?: string;
+  tsa_acknowledge_date?: string;
+  tsm_handling_time?: string;
+  tsa_handling_time?: string;
 }
 
 function SpinnerEmpty({ onCancel }: { onCancel?: () => void }) {
@@ -177,6 +197,13 @@ export function UpdateTicketDialog({
   so_number,
   so_amount,
   qty_sold,
+  close_reason,
+  counter_offer,
+  client_specs,
+  tsm_acknowledge_date,
+  tsa_acknowledge_date,
+  tsm_handling_time,
+  tsa_handling_time,
   quotation_number,
   quotation_amount,
   payment_terms,
@@ -196,6 +223,10 @@ export function UpdateTicketDialog({
   const [sourceCompanyState, setSourceCompany] = useState("");
   const [ticketReceivedState, setTicketReceived] = useState("");
   const [ticketEndorsedState, setTicketEndorsed] = useState("");
+  const [tsmAcknowledgeDate, setTsmAcknowledgeDate] = useState("");
+  const [tsaAcknowledgeDate, setTsaAcknowledgeDate] = useState("");
+  const [tsmHandlingTime, setTsmHandlingTime] = useState("");
+  const [tsaHandlingTime, setTsaHandlingTime] = useState("");
   const [genderState, setGender] = useState("");
   const [channelState, setChannel] = useState("");
   const [wrapUpState, setWrapUp] = useState("");
@@ -263,6 +294,19 @@ export function UpdateTicketDialog({
     setPaymentDate(payment_date || "");
     setDeliveryDate(delivery_date || "");
     setDateCreated(date_created || "");
+    setTsmAcknowledgeDate(tsm_acknowledge_date || "");
+    setTsaAcknowledgeDate(tsa_acknowledge_date || "");
+    setTsmHandlingTime(tsm_handling_time || "");
+    setTsaHandlingTime(tsa_handling_time || "");
+  
+    setCloseReason(close_reason || "");
+    setCounterOffer(counter_offer || "");
+    setClientSpecs(client_specs || "");
+
+    setTsmAcknowledgeDate(toDatetimeLocal(tsm_acknowledge_date));
+    setTsaAcknowledgeDate(toDatetimeLocal(tsa_acknowledge_date));
+    setTsmHandlingTime(toDatetimeLocal(tsm_handling_time));
+    setTsaHandlingTime(toDatetimeLocal(tsa_handling_time));
   }, [
     _id,
     type_client,
@@ -296,11 +340,11 @@ export function UpdateTicketDialog({
     payment_date,
     delivery_date,
     date_created,
+    tsm_acknowledge_date,
+    tsa_acknowledge_date,
+    tsm_handling_time,
+    tsa_handling_time,
   ]);
-
-  useEffect(() => {
-    setDateCreated(new Date().toISOString());
-  }, []);
 
   useEffect(() => {
     if (ticket_reference_number) {
@@ -325,8 +369,16 @@ const newActivity: Activity & {
   client_segment: clientSegment,
   traffic: trafficState,
   source_company: sourceCompanyState,
+
   ticket_received: ticketReceivedState,
   ticket_endorsed: ticketEndorsedState,
+
+  // ✅ ADD THESE
+  tsm_acknowledge_date: tsmAcknowledgeDate,
+  tsa_acknowledge_date: tsaAcknowledgeDate,
+  tsm_handling_time: tsmHandlingTime,
+  tsa_handling_time: tsaHandlingTime,
+
   gender: genderState,
   channel: channelState,
   wrap_up: wrapUpState,
@@ -361,6 +413,7 @@ const newActivity: Activity & {
     client_specs: clientSpecs,
   }),
 };
+
 
     try {
       const res = await fetch("/api/act-save-activity", {
@@ -693,6 +746,17 @@ const newActivity: Activity & {
                 setCounterOffer={setCounterOffer}
                 clientSpecs={clientSpecs}
                 setClientSpecs={setClientSpecs}
+                tsmAcknowledgeDate={tsmAcknowledgeDate}
+                setTsmAcknowledgeDate={setTsmAcknowledgeDate}
+
+                tsaAcknowledgeDate={tsaAcknowledgeDate}
+                setTsaAcknowledgeDate={setTsaAcknowledgeDate}
+
+                tsmHandlingTime={tsmHandlingTime}
+                setTsmHandlingTime={setTsmHandlingTime}
+
+                tsaHandlingTime={tsaHandlingTime}
+                setTsaHandlingTime={setTsaHandlingTime}
                 />
               )}
             </div>

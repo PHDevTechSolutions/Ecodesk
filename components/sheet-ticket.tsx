@@ -106,6 +106,18 @@ interface TicketSheetProps {
 
     clientSpecs: string;
     setClientSpecs: React.Dispatch<React.SetStateAction<string>>;
+
+    tsmAcknowledgeDate: string;
+    setTsmAcknowledgeDate: React.Dispatch<React.SetStateAction<string>>;
+
+    tsaAcknowledgeDate: string;
+    setTsaAcknowledgeDate: React.Dispatch<React.SetStateAction<string>>;
+
+    tsmHandlingTime: string;
+    setTsmHandlingTime: React.Dispatch<React.SetStateAction<string>>;
+
+    tsaHandlingTime: string;
+    setTsaHandlingTime: React.Dispatch<React.SetStateAction<string>>;
     loading: boolean;
     handleBack: () => void;
     handleNext: () => void;
@@ -281,6 +293,14 @@ export function TicketSheet(props: TicketSheetProps) {
         setCounterOffer,
         clientSpecs,
         setClientSpecs,
+        tsmAcknowledgeDate,
+        setTsmAcknowledgeDate,
+        tsaAcknowledgeDate,
+        setTsaAcknowledgeDate,
+        tsmHandlingTime,
+        setTsmHandlingTime,
+        tsaHandlingTime,
+        setTsaHandlingTime,
         handleBack,
         handleNext,
         handleUpdate
@@ -599,27 +619,64 @@ export function TicketSheet(props: TicketSheetProps) {
                                     value={source}
                                     onChange={setSource}
                                     placeholder="Select a source"
-                                    options={[
-                                        { value: "FB Ads", label: "FB Ads" },
-                                        { value: "Viber", label: "Viber Community" },
-                                        { value: "Whatsapp", label: "Whatsapp Community" },
-                                        { value: "SMS", label: "SMS" },
-                                        { value: "Website", label: "Website" },
-                                        { value: "Word of Mouth", label: "Word of Mouth" },
-                                        { value: "Quotation Docs", label: "Quotation Docs" },
-                                        { value: "Google Search", label: "Google Search" },
-                                        { value: "Site Visit", label: "Site Visit" },
-                                        { value: "Agent Call", label: "Agent Call" },
-                                        { value: "Catalogue", label: "Catalogue" },
-                                        { value: "Shopee", label: "Shopee" },
-                                        { value: "Lazada", label: "Lazada" },
-                                        { value: "Tiktok", label: "Tiktok" },
-                                        { value: "Worldbex", label: "Worldbex" },
-                                        { value: "PhilConstruct", label: "PhilConstruct" },
-                                        { value: "Conex", label: "Conex" },
-                                        { value: "Product Demo", label: "Product Demo" },
-                                    ]}
+                                options={[
+                                { value: "FB Ads", label: "FB Ads" },
+                                { value: "LNB", label: "LNB" }, // ← added
+                                { value: "Viber", label: "Viber Community" },
+                                { value: "Whatsapp", label: "Whatsapp Community" },
+                                { value: "SMS", label: "SMS" },
+                                { value: "Website", label: "Website" },
+                                { value: "Word of Mouth", label: "Word of Mouth" },
+                                { value: "Quotation Docs", label: "Quotation Docs" },
+                                { value: "Google Search", label: "Google Search" },
+                                { value: "Site Visit", label: "Site Visit" },
+                                { value: "Agent Call", label: "Agent Call" },
+                                { value: "Catalogue", label: "Catalogue" },
+                                { value: "Shopee", label: "Shopee" },
+                                { value: "Lazada", label: "Lazada" },
+                                { value: "Tiktok", label: "Tiktok" },
+                                { value: "Worldbex", label: "Worldbex" },
+                                { value: "PhilConstruct", label: "PhilConstruct" },
+                                { value: "Conex", label: "Conex" },
+                                { value: "Product Demo", label: "Product Demo" },
+                                ]}
                                 />
+                            </Field>
+
+                            <Field>
+                            <FieldLabel>TSM Acknowledge Date</FieldLabel>
+                            <InputField
+                                type="datetime-local"
+                                value={tsmAcknowledgeDate}
+                                onChange={(e) => setTsmAcknowledgeDate(e.target.value)}
+                            />
+                            </Field>
+
+                            <Field>
+                            <FieldLabel>TSA Acknowledge Date</FieldLabel>
+                            <InputField
+                                type="datetime-local"
+                                value={tsaAcknowledgeDate}
+                                onChange={(e) => setTsaAcknowledgeDate(e.target.value)}
+                            />
+                            </Field>
+
+                            <Field>
+                            <FieldLabel>TSM Handling Time</FieldLabel>
+                            <InputField
+                                type="datetime-local"
+                                value={tsmHandlingTime}
+                                onChange={(e) => setTsmHandlingTime(e.target.value)}
+                            />
+                            </Field>
+
+                            <Field>
+                            <FieldLabel>TSA Handling Time</FieldLabel>
+                            <InputField
+                                type="datetime-local"
+                                value={tsaHandlingTime}
+                                onChange={(e) => setTsaHandlingTime(e.target.value)}
+                            />
                             </Field>
                         </FieldSet>
                     </FieldGroup>

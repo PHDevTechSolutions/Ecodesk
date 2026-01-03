@@ -1,6 +1,7 @@
+// components/activity-done-dialog.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,11 @@ interface DoneDialogProps {
     client_specs: string;
   }) => void;
   loading?: boolean;
+
+  // ✅ autofill sources
+  close_reason?: string;
+  counter_offer?: string;
+  client_specs?: string;
 }
 
 export const DoneDialog: React.FC<DoneDialogProps> = ({
@@ -29,10 +35,23 @@ export const DoneDialog: React.FC<DoneDialogProps> = ({
   onOpenChange,
   onConfirm,
   loading = false,
+
+  close_reason,
+  counter_offer,
+  client_specs,
 }) => {
   const [closeReason, setCloseReason] = useState("");
   const [counterOffer, setCounterOffer] = useState("");
   const [clientSpecs, setClientSpecs] = useState("");
+
+  // ✅ AUTOFILL WHEN DIALOG OPENS
+  useEffect(() => {
+    if (open) {
+      setCloseReason(close_reason || "");
+      setCounterOffer(counter_offer || "");
+      setClientSpecs(client_specs || "");
+    }
+  }, [open, close_reason, counter_offer, client_specs]);
 
   const isValid =
     closeReason.trim() !== "" &&
@@ -48,7 +67,7 @@ export const DoneDialog: React.FC<DoneDialogProps> = ({
       client_specs: clientSpecs.trim(),
     });
 
-    // optional: reset after submit
+    // reset after submit
     setCloseReason("");
     setCounterOffer("");
     setClientSpecs("");
@@ -66,7 +85,6 @@ export const DoneDialog: React.FC<DoneDialogProps> = ({
               the ticket later if needed.
             </p>
 
-            {/* 1. Add reason */}
             <div className="space-y-1">
               <Label>1. Add reason *</Label>
               <Textarea
@@ -76,7 +94,6 @@ export const DoneDialog: React.FC<DoneDialogProps> = ({
               />
             </div>
 
-            {/* 2. Add counter offer */}
             <div className="space-y-1">
               <Label>2. Add counter offer *</Label>
               <Textarea
@@ -86,7 +103,6 @@ export const DoneDialog: React.FC<DoneDialogProps> = ({
               />
             </div>
 
-            {/* 3. Client Specs */}
             <div className="space-y-1">
               <Label>3. Client Specs *</Label>
               <Textarea
@@ -107,10 +123,7 @@ export const DoneDialog: React.FC<DoneDialogProps> = ({
             Cancel
           </Button>
 
-          <Button
-            onClick={handleConfirm}
-            disabled={!isValid || loading}
-          >
+          <Button onClick={handleConfirm} disabled={!isValid || loading}>
             {loading ? "Updating..." : "Confirm"}
           </Button>
         </DialogFooter>
